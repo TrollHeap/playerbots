@@ -1,6 +1,7 @@
 
 #include "playerbot/playerbot.h"
 #include "ItemUsageValue.h"
+#include "EquipmentContribution.h"
 #include "CraftValues.h"
 #include "MountValues.h"
 #include "BudgetValues.h"
@@ -648,6 +649,20 @@ ItemUsage ItemUsageValue::QueryItemUsageForEquip(ItemQualifier& itemQualifier, P
     uint8 slot = dest & 255;
 
     ai->TellDebug(ai->GetMaster(), "Checking equip: " + chat->formatItem(itemProto) + " to " + chat->formatSlot(slot) + " vs " + (oldItem ? chat->formatItem(oldItem->GetProto()) : "empty"), "debug equip");
+
+    bool hasSpell = false;
+    for (uint8 i = 0; i < MAX_ITEM_PROTO_SPELLS; ++i)
+    {
+        if (itemProto->Spells[i].SpellId)
+        {
+            hasSpell = true;
+            break;
+        }
+    }
+
+    if (!statWeight && slot != EQUIPMENT_SLOT_BODY && slot != EQUIPMENT_SLOT_TABARD &&
+        !HasEquipmentContribution(itemProto->Armor, itemProto->Block, itemProto->Damage[0].DamageMax, hasSpell))
+        return ItemUsage::ITEM_USAGE_NONE;
 
     if (itemProto->Class == ITEM_CLASS_WEAPON &&
         !sRandomItemMgr.ShouldEquipWeaponForSpec(bot->getClass(), specId, itemProto))
