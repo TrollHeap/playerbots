@@ -237,6 +237,9 @@ AiPlayerbot.RandomBotQuestIds = 7848,3802,5505,6502,7761,9378
 # Bots will chat in say/guild when they invite other bots to groups/raids/guilds
 # AiPlayerbot.InviteChat = 1
 
+# Report every quest objective update to the master/group.
+# AiPlayerbot.TellQuestProgress = 1
+
 # The summon command can be used without restriction by non-gms.
 # AiPlayerbot.NonGmFreeSummon = 0
 

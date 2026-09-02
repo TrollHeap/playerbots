@@ -250,6 +250,7 @@ public:
     bool randomBotFormGuild;
     bool randomBotRandomPassword;
     bool inviteChat;
+    bool tellQuestProgress;
     bool enableOffSpecStrategies;
     bool useWanderAsDefaultFollowStrategy;
     std::string defaultFormation;

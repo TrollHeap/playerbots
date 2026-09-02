@@ -281,7 +281,8 @@ bool QuestUpdateAddKillAction::Execute(Event& event)
         GameObjectInfo const* info = sObjectMgr.GetGameObjectInfo(entry);
         if (info)
         {
-            ai->TellPlayer(requester, chat->formatQuestObjective(info->name, available, required), PlayerbotSecurityLevel::PLAYERBOT_SECURITY_ALLOW_ALL, false);
+            if (sPlayerbotAIConfig.tellQuestProgress)
+                ai->TellPlayer(requester, chat->formatQuestObjective(info->name, available, required), PlayerbotSecurityLevel::PLAYERBOT_SECURITY_ALLOW_ALL, false);
 
             BroadcastHelper::BroadcastQuestUpdateAddKill(ai, bot, qInfo, available, required, info->name);
         }
@@ -291,7 +292,8 @@ bool QuestUpdateAddKillAction::Execute(Event& event)
         CreatureInfo const* info = sObjectMgr.GetCreatureTemplate(entry);
         if (info)
         {
-            ai->TellPlayer(requester, chat->formatQuestObjective(info->Name, available, required), PlayerbotSecurityLevel::PLAYERBOT_SECURITY_ALLOW_ALL, false);
+            if (sPlayerbotAIConfig.tellQuestProgress)
+                ai->TellPlayer(requester, chat->formatQuestObjective(info->Name, available, required), PlayerbotSecurityLevel::PLAYERBOT_SECURITY_ALLOW_ALL, false);
 
             BroadcastHelper::BroadcastQuestUpdateAddKill(ai, bot, qInfo, available, required, info->Name);
         }
@@ -304,12 +306,13 @@ bool QuestUpdateAddKillAction::Execute(Event& event)
         placeholders["%available"] = available;
         placeholders["%required"] = required;
 
-        ai->TellPlayer(
-            requester,
-            BOT_TEXT2("%available/%required for questId: %quest_id", placeholders),
-            PlayerbotSecurityLevel::PLAYERBOT_SECURITY_ALLOW_ALL,
-            false
-        );
+        if (sPlayerbotAIConfig.tellQuestProgress)
+            ai->TellPlayer(
+                requester,
+                BOT_TEXT2("%available/%required for questId: %quest_id", placeholders),
+                PlayerbotSecurityLevel::PLAYERBOT_SECURITY_ALLOW_ALL,
+                false
+            );
     }
 
     sPlayerbotAIConfig.logEvent(ai, "QuestUpdateAddKillAction", std::to_string(questId), std::to_string((float)available / (float)required));
@@ -340,12 +343,13 @@ bool QuestUpdateAddItemAction::Execute(Event& event)
             placeholders["%quest_link"] = chat->formatQuest(pair.first);
             uint32 requiredItemsCount = pair.second;
             placeholders["%quest_obj_required"] = std::to_string(requiredItemsCount);
-            ai->TellPlayer(
-                requester,
-                BOT_TEXT2("%quest_link - %item_link %quest_obj_available/%quest_obj_required", placeholders),
-                PlayerbotSecurityLevel::PLAYERBOT_SECURITY_ALLOW_ALL,
-                false
-            );
+            if (sPlayerbotAIConfig.tellQuestProgress)
+                ai->TellPlayer(
+                    requester,
+                    BOT_TEXT2("%quest_link - %item_link %quest_obj_available/%quest_obj_required", placeholders),
+                    PlayerbotSecurityLevel::PLAYERBOT_SECURITY_ALLOW_ALL,
+                    false
+                );
 
             BroadcastHelper::BroadcastQuestUpdateAddItem(ai, bot, pair.first, availableItemsCount, requiredItemsCount, itemPrototype);
         }
@@ -355,12 +359,13 @@ bool QuestUpdateAddItemAction::Execute(Event& event)
         placeholders["%item_id"] = itemId;
         placeholders["%count"] = count;
 
-        ai->TellPlayer(
-            requester,
-            BOT_TEXT2("Got %count of itemId: %item_id for quest", placeholders),
-            PlayerbotSecurityLevel::PLAYERBOT_SECURITY_ALLOW_ALL,
-            false
-        );
+        if (sPlayerbotAIConfig.tellQuestProgress)
+            ai->TellPlayer(
+                requester,
+                BOT_TEXT2("Got %count of itemId: %item_id for quest", placeholders),
+                PlayerbotSecurityLevel::PLAYERBOT_SECURITY_ALLOW_ALL,
+                false
+            );
     }
 
     sPlayerbotAIConfig.logEvent(ai, "QuestUpdateAddItemAction", std::to_string(itemId), "count: " + std::to_string(count));
