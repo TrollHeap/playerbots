@@ -31,6 +31,23 @@ namespace ai
         p << roles_mask;
         inviter->GetSession()->HandleGroupInviteOpcode(p);
 
+        if (inviter == bot && player->isRealPlayer())
+        {
+            std::string reason;
+            if (getName() == "invite nearby")
+                reason = "nearby_group";
+            else if (getName() == "invite guild")
+                reason = "guild_group";
+            else if (getName() == "invite")
+                reason = "requested_invite";
+            if (!reason.empty())
+            {
+                SET_AI_VALUE(std::string, "manual string::llm invite player", player->GetName());
+                SET_AI_VALUE(std::string, "manual string::llm invite reason", reason);
+                SET_AI_VALUE(time_t, "manual time::llm invite expires", time(0) + 300);
+            }
+        }
+
         return true;
     }
 

@@ -5,6 +5,8 @@
 #include "Chat/ChannelMgr.h"
 #include "playerbot/ServerFacade.h"
 #include "playerbot/AiFactory.h"
+#include "playerbot/TravelMgr.h"
+#include "BattleGround/BattleGroundWS.h"
 #include <regex>
 #include <boost/algorithm/string.hpp>
 #include "playerbot/PlayerbotLLMInterface.h"
@@ -538,6 +540,117 @@ void ChatReplyAction::ChatReplyDo(Player* bot, uint32 type, uint32 guid1, uint32
                 GetAIChatPlaceholders(placeholders, bot, player);
                 GetAIChatPlaceholders(placeholders, bot, "bot");
                 GetAIChatPlaceholders(placeholders, player, "other");
+
+                std::string botState = "idle";
+                Unit* botTarget = nullptr;
+                if (!bot->IsAlive())
+                    botState = "dead";
+                else if (bot->IsInCombat())
+                {
+                    botState = "combat";
+                    botTarget = bot->GetVictim();
+                }
+                else if (bot->IsMoving())
+                    botState = "moving";
+                placeholders["<bot state>"] = botState;
+                placeholders["<bot target>"] = botTarget ? botTarget->GetName() : "";
+                std::string botHealthState;
+                if (bot->IsAlive())
+                {
+                    float health = bot->GetHealthPercent();
+                    botHealthState = health <= 25.0f ? "critical" : health < 75.0f ? "wounded" : "healthy";
+                }
+                placeholders["<bot health state>"] = botHealthState;
+                placeholders["<bot mounted>"] = bot->IsMounted() ? "true" : "false";
+                placeholders["<bot target type>"] = botTarget ?
+                    (botTarget->GetTypeId() == TYPEID_PLAYER ? "player" : "creature") : "";
+                placeholders["<bot target level>"] = botTarget ? std::to_string(botTarget->GetLevel()) : "";
+
+                std::string botActivity;
+                std::string botDestination;
+                TravelTarget* travelTarget = AI_VALUE(TravelTarget*, "travel target");
+                if (travelTarget && (travelTarget->GetStatus() == TravelStatus::TRAVEL_STATUS_TRAVEL ||
+                    travelTarget->GetStatus() == TravelStatus::TRAVEL_STATUS_WORK))
+                {
+                    switch (travelTarget->GetTravelState())
+                    {
+                    case TravelState::TRAVEL_STATE_TRAVEL_PICK_UP_QUEST:
+                        botActivity = "travel_quest_pickup";
+                        break;
+                    case TravelState::TRAVEL_STATE_WORK_PICK_UP_QUEST:
+                        botActivity = "quest_pickup";
+                        break;
+                    case TravelState::TRAVEL_STATE_TRAVEL_DO_QUEST:
+                        botActivity = "travel_quest";
+                        break;
+                    case TravelState::TRAVEL_STATE_WORK_DO_QUEST:
+                        botActivity = "questing";
+                        break;
+                    case TravelState::TRAVEL_STATE_TRAVEL_HAND_IN_QUEST:
+                        botActivity = "travel_quest_turnin";
+                        break;
+                    case TravelState::TRAVEL_STATE_WORK_HAND_IN_QUEST:
+                        botActivity = "quest_turnin";
+                        break;
+                    case TravelState::TRAVEL_STATE_TRAVEL_RPG:
+                        botActivity = "travel_rpg";
+                        break;
+                    case TravelState::TRAVEL_STATE_TRAVEL_EXPLORE:
+                        botActivity = "travel_explore";
+                        break;
+                    default:
+                        break;
+                    }
+                    if (!botActivity.empty() && travelTarget->GetDestination())
+                        botDestination = travelTarget->GetDestination()->GetTitle();
+                }
+                placeholders["<bot activity>"] = botActivity;
+                placeholders["<bot destination>"] = botDestination;
+
+                std::string inviteReason;
+                if (AI_VALUE(time_t, "manual time::llm invite expires") >= time(0) &&
+                    AI_VALUE(std::string, "manual string::llm invite player") == playerName)
+                    inviteReason = AI_VALUE(std::string, "manual string::llm invite reason");
+                placeholders["<bot invite reason>"] = inviteReason;
+
+                Group* botGroup = bot->GetGroup();
+                placeholders["<bot group type>"] = botGroup ? (botGroup->IsRaidGroup() ? "raid" : "party") : "solo";
+                placeholders["<bot group size>"] = botGroup ? std::to_string(botGroup->GetMembersCount()) : "1";
+                placeholders["<bot group leader>"] = botGroup ? botGroup->GetLeaderName() : bot->GetName();
+                placeholders["<player in group>"] =
+                    botGroup && botGroup->IsMember(player->GetObjectGuid()) ? "true" : "false";
+
+                std::string battleground;
+                std::string battlegroundStatus;
+                std::string carriesFlag;
+                if (bot->InBattleGround() && bot->GetBattleGround())
+                {
+                    switch (bot->GetBattleGroundTypeId())
+                    {
+                    case BATTLEGROUND_WS:
+                        battleground = "wsg";
+                        carriesFlag = bot->HasAura(BG_WS_SPELL_WARSONG_FLAG) ||
+                            bot->HasAura(BG_WS_SPELL_SILVERWING_FLAG) ? "true" : "false";
+                        break;
+                    case BATTLEGROUND_AB:
+                        battleground = "ab";
+                        break;
+                    case BATTLEGROUND_AV:
+                        battleground = "av";
+                        break;
+                    default:
+                        break;
+                    }
+                    if (bot->GetBattleGround()->GetStatus() == STATUS_WAIT_JOIN)
+                        battlegroundStatus = "waiting";
+                    else if (bot->GetBattleGround()->GetStatus() == STATUS_IN_PROGRESS)
+                        battlegroundStatus = "active";
+                    else if (bot->GetBattleGround()->GetStatus() == STATUS_WAIT_LEAVE)
+                        battlegroundStatus = "finished";
+                }
+                placeholders["<bot battleground>"] = battleground;
+                placeholders["<bot battleground status>"] = battlegroundStatus;
+                placeholders["<bot carries flag>"] = carriesFlag;
 
                 std::map<ChatChannelSource, std::string> sourceName;
                 sourceName[ChatChannelSource::SRC_GUILD] = "in guild chat";
