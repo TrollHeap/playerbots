@@ -36,6 +36,7 @@ PlayerbotHolder::PlayerbotHolder() : PlayerbotAIBase()
     m_holderHandlers["rl"] = &PlayerbotHolder::HandleRaidLeader;
     m_holderHandlers["create"] = &PlayerbotHolder::HandleCreate;
     m_holderHandlers["group"] = &PlayerbotHolder::HandleGroup;
+    m_holderHandlers["bgqueue"] = &PlayerbotHolder::HandleRemoteBgQueue;
 #ifdef GenerateBotTests
     m_holderHandlers["runtest"] = &PlayerbotHolder::HandleRunTest;
 #endif
@@ -2068,6 +2069,94 @@ std::list<std::string> PlayerbotHolder::HandleCreate(Player* master, const std::
 
     CreateBot(master, param, messages, guid);
 
+    return messages;
+}
+
+std::list<std::string> PlayerbotHolder::HandleRemoteBgQueue(Player* master, const std::string param, AccountTypes /*security*/)
+{
+    std::list<std::string> messages;
+    if (!sPlayerbotAIConfig.remotePlayerBgQueue)
+    {
+        messages.push_back("File BG distante desactivee sur ce serveur.");
+        return messages;
+    }
+    if (!master)
+    {
+        messages.push_back("Cette commande doit etre utilisee en jeu.");
+        return messages;
+    }
+
+    BattleGroundTypeId bgTypeId = BATTLEGROUND_TYPE_NONE;
+    if (param == "WSG" || param == "wsg")
+        bgTypeId = BATTLEGROUND_WS;
+    else if (param == "AB" || param == "ab")
+        bgTypeId = BATTLEGROUND_AB;
+    else if (param == "AV" || param == "av")
+        bgTypeId = BATTLEGROUND_AV;
+    else
+    {
+        messages.push_back("Usage: .bot bgqueue WSG|AB|AV");
+        return messages;
+    }
+
+    BattleGroundQueueTypeId queueTypeId = BattleGroundMgr::BgQueueTypeId(bgTypeId);
+    BattleGround* bg = sBattleGroundMgr.GetBattleGroundTemplate(bgTypeId);
+    if (!bg || master->InBattleGround())
+    {
+        messages.push_back("Impossible de rejoindre cette file maintenant.");
+        return messages;
+    }
+    if (!master->GetBGAccessByLevel(bgTypeId))
+    {
+        messages.push_back("Votre niveau ne permet pas de rejoindre ce champ de bataille.");
+        return messages;
+    }
+    if (!master->CanJoinToBattleground())
+    {
+        WorldPacket data;
+        sBattleGroundMgr.BuildGroupJoinedBattlegroundPacket(data, bgTypeId, BG_GROUP_JOIN_STATUS_DESERTERS);
+        master->GetSession()->SendPacket(data);
+        return messages;
+    }
+    if (master->GetBattleGroundQueueIndex(queueTypeId) < PLAYER_MAX_BATTLEGROUND_QUEUES)
+    {
+        messages.push_back("Vous etes deja dans cette file.");
+        return messages;
+    }
+    if (!master->HasFreeBattleGroundQueueId())
+    {
+        messages.push_back("Vous avez deja trop de files actives.");
+        return messages;
+    }
+
+    AddGroupToQueueInfo info;
+    info.team = master->GetTeam();
+    info.clientInstanceId = 0;
+    info.mapId = bg->GetMapId();
+    BattleGroundBracketId bracketId = sBattleGroundMgr.GetBattleGroundBracketIdFromLevel(bgTypeId, master->GetLevel());
+    ObjectGuid playerGuid = master->GetObjectGuid();
+    uint32 mapId = bg->GetMapId();
+
+    sWorld.GetBGQueue().GetMessager().AddMessage([queueTypeId, playerGuid, info, bgTypeId, bracketId, mapId](BattleGroundQueue* queue)
+    {
+        BattleGroundQueueItem& queueItem = queue->GetBattleGroundQueue(queueTypeId);
+        GroupQueueInfo* groupInfo = queueItem.AddGroup(playerGuid, info, bgTypeId, bracketId, false, 0);
+        uint32 avgTime = queueItem.GetAverageQueueWaitTime(groupInfo, bracketId);
+        sWorld.GetMessager().AddMessage([playerGuid, queueTypeId, bgTypeId, avgTime, mapId](World* /*world*/)
+        {
+            if (Player* player = sObjectMgr.GetPlayer(playerGuid))
+            {
+                uint32 queueSlot = player->AddBattleGroundQueueId(queueTypeId);
+                player->SetBattleGroundEntryPoint();
+                WorldPacket data;
+                sBattleGroundMgr.BuildBattleGroundStatusPacket(data, true, bgTypeId, 0, mapId, queueSlot, STATUS_WAIT_QUEUE, avgTime, 0);
+                player->GetSession()->SendPacket(data);
+            }
+        });
+        queue->ScheduleQueueUpdate(queueTypeId, bgTypeId, bracketId);
+    });
+
+    messages.push_back("Demande de file envoyee.");
     return messages;
 }
 
