@@ -2339,59 +2339,19 @@ bool BGTactics::wsgPaths()
                 return  true;
             }
         }
-        else if (Preference < 7 || (atHordeGY && urand(0, 2))) { // preference < 7 = move through graveyard (BUGGED)
+        else { // all other preference: run down the ramp
             if (bot->GetPositionX() < 985.f) //to the gate at the upper tunnel
-            {
-                MoveTo(bg->GetMapId(), 985.940125f, 1423.260254f, 345.418121f);
-                return  true;
-            }
-            else if (bot->GetPositionX() < 1054.5f) //to the gate at the upper tunnel
-            {
-                MoveTo(bg->GetMapId(), 1055.182251f, 1396.967529f, 339.361511f);
-                return  true;
-            }
-            else if (bot->GetPositionX() < 1070.f) //to the horde entrance
-            {
-                MoveTo(bg->GetMapId(), 1076.778076f, 1396.0f, 324.0f, false, false, true);
-                return  true;
-            }
-            else if (bot->GetPositionX() < 1125.f) //to the horde entrance
-            {
-                MoveTo(bg->GetMapId(), 1125.778076f, bot->GetPositionY(), 316.567047f);
-                return  true;
-            }
-        }
-        else if (!atHordeGY || urand(0, 2)){ //all other preference: run down the ramp 
-            if (bot->GetPositionX() < 985.f) //to the gate at the upper tunnel
-            {
-                MoveTo(bg->GetMapId(), 985.940125f, 1423.260254f, 345.418121f);
-                return  true;
-            }
+                return MoveTo(bg->GetMapId(), 985.940125f, 1423.260254f, 345.418121f);
             else if (bot->GetPositionX() < 1031.f) //to the first step of the ramp from the tunnel
-            {
-                MoveTo(bg->GetMapId(), 1031.764282f, 1454.516235f, 343.337860f);
-                return  true;
-            }
+                return MoveTo(bg->GetMapId(), 1031.764282f, 1454.516235f, 343.337860f);
             else if (bot->GetPositionX() < 1051.f && bot->GetPositionY() < 1494.f) //to the second step of the ramp from the tunnel
-            {
-                MoveTo(bg->GetMapId(), 1051.304810f, 1494.917725f, 342.043518f);
-                return  true;
-            }
+                return MoveTo(bg->GetMapId(), 1051.304810f, 1494.917725f, 342.043518f);
             else if (bot->GetPositionX() < 1050.f && bot->GetPositionY() < 1538.f) //down the ramp
-            {
-                MoveTo(bg->GetMapId(), 1050.089478f, 1538.054443f, 332.460388f);
-                return  true;
-            }
+                return MoveTo(bg->GetMapId(), 1050.089478f, 1538.054443f, 332.460388f);
             else if (bot->GetPositionX() < 1098.f) //at the ground now
-            {
-                MoveTo(bg->GetMapId(), 1098.716797f, 1535.618652f, 315.727539f);
-                return  true;
-            }
+                return MoveTo(bg->GetMapId(), 1098.716797f, 1535.618652f, 315.727539f);
             else if (bot->GetPositionX() < 1239.f)
-            {
-                MoveTo(bg->GetMapId(), 1239.085693f, 1541.408569f + frand(-2, +2), 306.491791f);
-                return  true;
-            }
+                return MoveTo(bg->GetMapId(), 1239.085693f, 1541.408569f + frand(-2, +2), 306.491791f);
         }
         if (bot->GetPositionX() < 1227.f) //move to a more random location in the middle part
         {
