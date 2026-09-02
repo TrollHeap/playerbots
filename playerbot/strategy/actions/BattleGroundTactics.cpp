@@ -2339,7 +2339,27 @@ bool BGTactics::wsgPaths()
                 return  true;
             }
         }
-        else { // all other preference: run down the ramp
+        else if (atHordeGY || Preference < 7)
+        {
+            if (bot->GetPositionX() < 1054.5f) // approach the graveyard edge directly
+            {
+                if (MoveTo(bg->GetMapId(), 1055.182251f, 1396.967529f, 339.361511f, false, false, true))
+                    return true;
+            }
+            else if (bot->GetPositionX() < 1070.f) // jump down to the field
+            {
+                if (MoveTo(bg->GetMapId(), 1076.778076f, 1396.0f, 324.0f, false, false, true))
+                    return true;
+            }
+            else if (bot->GetPositionX() < 1125.f) // continue towards the horde entrance
+            {
+                if (MoveTo(bg->GetMapId(), 1125.778076f, bot->GetPositionY(), 316.567047f))
+                    return true;
+            }
+        }
+
+        // run down the ramp if the graveyard jump is rejected
+        {
             if (bot->GetPositionX() < 985.f) //to the gate at the upper tunnel
                 return MoveTo(bg->GetMapId(), 985.940125f, 1423.260254f, 345.418121f);
             else if (bot->GetPositionX() < 1031.f) //to the first step of the ramp from the tunnel

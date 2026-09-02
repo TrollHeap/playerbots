@@ -14,12 +14,21 @@ def main() -> None:
         "bool BGTactics::wsgRoofJump()", 1
     )[0]
 
-    assert "move through graveyard (BUGGED)" not in wsg_paths
-    assert "1055.182251f, 1396.967529f, 339.361511f" not in wsg_paths
     assert "if (Preference < 4 && !atHordeGY)" in wsg_paths
-    assert "else { // all other preference: run down the ramp" in wsg_paths
+    assert "else if (atHordeGY || Preference < 7)" in wsg_paths
+    assert (
+        "MoveTo(bg->GetMapId(), 1055.182251f, 1396.967529f, "
+        "339.361511f, false, false, true)"
+        in wsg_paths
+    )
+    assert (
+        "MoveTo(bg->GetMapId(), 1076.778076f, 1396.0f, 324.0f, "
+        "false, false, true)"
+        in wsg_paths
+    )
+    assert "run down the ramp if the graveyard jump is rejected" in wsg_paths
     ramp = wsg_paths.split(
-        "else { // all other preference: run down the ramp", 1
+        "run down the ramp if the graveyard jump is rejected", 1
     )[1].split("if (bot->GetPositionX() < 1227.f)", 1)[0]
     assert ramp.count("return MoveTo(") == 6
     assert (
