@@ -11,14 +11,6 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - name: Checkout Playerbots
-        uses: actions/checkout@v4
-        with:
-          path: playerbots
-
-      - name: Run fork contracts
-        run: make -C playerbots test
-
       - name: Checkout CMaNGOS Classic
         uses: actions/checkout@v4
         with:
@@ -26,6 +18,14 @@ jobs:
           ref: master
           path: mangos
           submodules: recursive
+
+      - name: Checkout Playerbots
+        uses: actions/checkout@v4
+        with:
+          path: mangos/src/modules/PlayerBots
+
+      - name: Run fork contracts
+        run: make -C mangos/src/modules/PlayerBots test
 
       - name: Install build dependencies
         run: |
@@ -44,7 +44,7 @@ jobs:
             -DBUILD_PLAYERBOTS=ON \
             -DBUILD_AHBOT=ON \
             -DBUILD_EXTRACTORS=OFF \
-            -DFETCHCONTENT_SOURCE_DIR_PLAYERBOTS="$GITHUB_WORKSPACE/playerbots" \
+            -DFETCHCONTENT_SOURCE_DIR_PLAYERBOTS="$GITHUB_WORKSPACE/mangos/src/modules/PlayerBots" \
             -DPCH=ON
 
       - name: Build
