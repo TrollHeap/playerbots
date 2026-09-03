@@ -2080,12 +2080,6 @@ std::list<std::string> PlayerbotHolder::HandleRemoteBgQueue(Player* master, cons
         messages.push_back("File BG distante desactivee sur ce serveur.");
         return messages;
     }
-    if (!master)
-    {
-        messages.push_back("Cette commande doit etre utilisee en jeu.");
-        return messages;
-    }
-
     BattleGroundTypeId bgTypeId = BATTLEGROUND_TYPE_NONE;
     if (param == "WSG" || param == "wsg")
         bgTypeId = BATTLEGROUND_WS;
@@ -2101,7 +2095,123 @@ std::list<std::string> PlayerbotHolder::HandleRemoteBgQueue(Player* master, cons
 
     BattleGroundQueueTypeId queueTypeId = BattleGroundMgr::BgQueueTypeId(bgTypeId);
     BattleGround* bg = sBattleGroundMgr.GetBattleGroundTemplate(bgTypeId);
-    if (!bg || master->InBattleGround())
+    if (!bg)
+    {
+        messages.push_back("Impossible de rejoindre cette file maintenant.");
+        return messages;
+    }
+
+    auto queuePlayer = [queueTypeId, bgTypeId, bg](Player* player, bool queueReserved)
+    {
+        AddGroupToQueueInfo info;
+        info.team = player->GetTeam();
+        info.clientInstanceId = 0;
+        info.mapId = bg->GetMapId();
+        BattleGroundBracketId bracketId = sBattleGroundMgr.GetBattleGroundBracketIdFromLevel(bgTypeId, player->GetLevel());
+        ObjectGuid playerGuid = player->GetObjectGuid();
+        uint32 mapId = bg->GetMapId();
+
+        sWorld.GetBGQueue().GetMessager().AddMessage([queueTypeId, playerGuid, info, bgTypeId, bracketId, mapId, queueReserved](BattleGroundQueue* queue)
+        {
+            BattleGroundQueueItem& queueItem = queue->GetBattleGroundQueue(queueTypeId);
+            GroupQueueInfo* groupInfo = queueItem.AddGroup(playerGuid, info, bgTypeId, bracketId, false, 0);
+            uint32 avgTime = queueItem.GetAverageQueueWaitTime(groupInfo, bracketId);
+            sWorld.GetMessager().AddMessage([playerGuid, queueTypeId, bgTypeId, avgTime, mapId, queueReserved](World* /*world*/)
+            {
+                if (Player* queuedPlayer = sObjectMgr.GetPlayer(playerGuid))
+                {
+                    uint32 queueSlot = queueReserved ? queuedPlayer->GetBattleGroundQueueIndex(queueTypeId) : queuedPlayer->AddBattleGroundQueueId(queueTypeId);
+                    if (queueSlot >= PLAYER_MAX_BATTLEGROUND_QUEUES)
+                        return;
+                    if (!queueReserved)
+                        queuedPlayer->SetBattleGroundEntryPoint();
+                    WorldPacket data;
+                    sBattleGroundMgr.BuildBattleGroundStatusPacket(data, true, bgTypeId, 0, mapId, queueSlot, STATUS_WAIT_QUEUE, avgTime, 0);
+                    queuedPlayer->GetSession()->SendPacket(data);
+                }
+            });
+            queue->ScheduleQueueUpdate(queueTypeId, bgTypeId, bracketId);
+        });
+    };
+
+    if (!master)
+    {
+        if (bgTypeId != BATTLEGROUND_WS)
+        {
+            messages.push_back("La console bot-only accepte uniquement WSG.");
+            return messages;
+        }
+        if (!sPlayerbotAIConfig.randomBotJoinBG)
+        {
+            messages.push_back("Le WSG bot-only exige RandomBotJoinBG actif.");
+            return messages;
+        }
+
+        std::vector<Player*> candidates[MAX_BATTLEGROUND_BRACKETS][2];
+        bool wsgAlreadyActive = false;
+
+        sRandomPlayerbotMgr.ForEachPlayerbot([&](Player* bot)
+        {
+            if (!bot || !bot->IsInWorld() || !sRandomPlayerbotMgr.IsFreeBot(bot) || !bot->GetPlayerbotAI())
+                return;
+            if (bot->InBattleGroundQueueForBattleGroundQueueType(queueTypeId) ||
+                (bot->InBattleGround() && bot->GetBattleGroundTypeId() == bgTypeId))
+            {
+                wsgAlreadyActive = true;
+                return;
+            }
+            if (bot->InBattleGround() || bot->InBattleGroundQueue() || bot->IsInCombat() || bot->GetGroup() || bot->IsTaxiFlying())
+                return;
+            if (!bot->GetBGAccessByLevel(bgTypeId) || !bot->CanJoinToBattleground() || !bot->HasFreeBattleGroundQueueId())
+                return;
+
+            BattleGroundBracketId bracketId = sBattleGroundMgr.GetBattleGroundBracketIdFromLevel(bgTypeId, bot->GetLevel());
+            if (bracketId < BG_BRACKET_ID_FIRST || bracketId >= MAX_BATTLEGROUND_BRACKETS)
+                return;
+
+            uint32 team = bot->GetTeam() == ALLIANCE ? 0 : 1;
+            candidates[bracketId][team].push_back(bot);
+        });
+
+        if (wsgAlreadyActive)
+        {
+            messages.push_back("Un WSG bot est deja actif ou en file.");
+            return messages;
+        }
+
+        uint32 minPlayers = bg->GetMinPlayersPerTeam();
+        int32 selectedBracket = -1;
+        for (int32 bracketId = MAX_BATTLEGROUND_BRACKETS - 1; bracketId >= BG_BRACKET_ID_FIRST; --bracketId)
+        {
+            if (candidates[bracketId][0].size() >= minPlayers && candidates[bracketId][1].size() >= minPlayers)
+            {
+                selectedBracket = bracketId;
+                break;
+            }
+        }
+
+        if (selectedBracket < 0)
+        {
+            messages.push_back("Pas assez de bots libres dans une meme tranche WSG.");
+            return messages;
+        }
+
+        BattleGroundBracketId bracketId = BattleGroundBracketId(selectedBracket);
+        for (uint32 team = 0; team < 2; ++team)
+            for (uint32 i = 0; i < minPlayers; ++i)
+            {
+                Player* bot = candidates[bracketId][team][i];
+                bot->AddBattleGroundQueueId(queueTypeId);
+                bot->SetBattleGroundEntryPoint();
+                sRandomPlayerbotMgr.BgBots[queueTypeId][bracketId][team]++;
+                queuePlayer(candidates[bracketId][team][i], true);
+            }
+
+        messages.push_back("File WSG bot-only amorcee avec " + std::to_string(minPlayers) + " bots par faction.");
+        return messages;
+    }
+
+    if (master->InBattleGround())
     {
         messages.push_back("Impossible de rejoindre cette file maintenant.");
         return messages;
@@ -2129,33 +2239,7 @@ std::list<std::string> PlayerbotHolder::HandleRemoteBgQueue(Player* master, cons
         return messages;
     }
 
-    AddGroupToQueueInfo info;
-    info.team = master->GetTeam();
-    info.clientInstanceId = 0;
-    info.mapId = bg->GetMapId();
-    BattleGroundBracketId bracketId = sBattleGroundMgr.GetBattleGroundBracketIdFromLevel(bgTypeId, master->GetLevel());
-    ObjectGuid playerGuid = master->GetObjectGuid();
-    uint32 mapId = bg->GetMapId();
-
-    sWorld.GetBGQueue().GetMessager().AddMessage([queueTypeId, playerGuid, info, bgTypeId, bracketId, mapId](BattleGroundQueue* queue)
-    {
-        BattleGroundQueueItem& queueItem = queue->GetBattleGroundQueue(queueTypeId);
-        GroupQueueInfo* groupInfo = queueItem.AddGroup(playerGuid, info, bgTypeId, bracketId, false, 0);
-        uint32 avgTime = queueItem.GetAverageQueueWaitTime(groupInfo, bracketId);
-        sWorld.GetMessager().AddMessage([playerGuid, queueTypeId, bgTypeId, avgTime, mapId](World* /*world*/)
-        {
-            if (Player* player = sObjectMgr.GetPlayer(playerGuid))
-            {
-                uint32 queueSlot = player->AddBattleGroundQueueId(queueTypeId);
-                player->SetBattleGroundEntryPoint();
-                WorldPacket data;
-                sBattleGroundMgr.BuildBattleGroundStatusPacket(data, true, bgTypeId, 0, mapId, queueSlot, STATUS_WAIT_QUEUE, avgTime, 0);
-                player->GetSession()->SendPacket(data);
-            }
-        });
-        queue->ScheduleQueueUpdate(queueTypeId, bgTypeId, bracketId);
-    });
-
+    queuePlayer(master, false);
     messages.push_back("Demande de file envoyee.");
     return messages;
 }

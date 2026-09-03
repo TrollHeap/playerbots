@@ -10,6 +10,10 @@ def main() -> None:
     config = (ROOT / "playerbot/PlayerbotAIConfig.cpp").read_text()
     config_dist = (ROOT / "playerbot/aiplayerbot.conf.dist.in").read_text()
     manager = (ROOT / "playerbot/PlayerbotMgr.cpp").read_text()
+    handler_start = manager.index("PlayerbotHolder::HandleRemoteBgQueue")
+    handler = manager[
+        handler_start : manager.index("PlayerbotHolder::HandleGroup", handler_start)
+    ]
 
     assert "bool remotePlayerBgQueue;" in header
     assert (
@@ -22,7 +26,16 @@ def main() -> None:
     assert "HasFreeBattleGroundQueueId()" in manager
     assert "GetBGAccessByLevel(bgTypeId)" in manager
     assert "AddGroup(playerGuid" in manager
+    assert "[queueTypeId, playerGuid, info, bgTypeId, bracketId, mapId, queueReserved]" in handler
     assert "ScheduleQueueUpdate" in manager
+    assert "File WSG bot-only amorcee" in manager
+    assert "sRandomPlayerbotMgr.ForEachPlayerbot" in manager
+    assert "GetMinPlayersPerTeam()" in manager
+    assert "candidates[bracketId][team][i]" in manager
+    assert "randomBotAutoJoinBG" not in handler
+    assert "InBattleGroundQueueForBattleGroundQueueType(queueTypeId)" in handler
+    assert "BgBots[queueTypeId][bracketId][team]++" in handler
+    assert "queuePlayer(candidates[bracketId][team][i], true)" in handler
 
 
 if __name__ == "__main__":
