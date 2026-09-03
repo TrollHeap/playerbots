@@ -6,6 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TACTICS = ROOT / "playerbot/strategy/actions/BattleGroundTactics.cpp"
 STRATEGY = ROOT / "playerbot/strategy/generic/BattlegroundStrategy.cpp"
 TRIGGERS = ROOT / "playerbot/strategy/triggers/PvpTriggers.cpp"
+TRIGGER_CONTEXT = ROOT / "playerbot/strategy/triggers/TriggerContext.h"
 CONFIG_HEADER = ROOT / "playerbot/PlayerbotAIConfig.h"
 CONFIG_SOURCE = ROOT / "playerbot/PlayerbotAIConfig.cpp"
 CONFIG_DIST = ROOT / "playerbot/aiplayerbot.conf.dist.in"
@@ -41,10 +42,22 @@ def main() -> None:
     advanced_strategy = strategy.split(
         "if (sPlayerbotAIConfig.advancedBgTactics)", 1
     )[1].split("else", 1)[0]
-    assert "bot->GetInstanceId()" in wsg
-    assert "enemyStrategy" in wsg
-    assert "enemyStrategy == 2" in wsg
+    assert "bot->GetInstanceId()" in tactics
+    assert "enemyStrategy" in tactics
+    assert "enemyStrategy == 2" in tactics
     assert "defenderCount" in wsg
+    assert "wsgDefenderCount(bot, bg)" in wsg
+    defender_count = section(tactics, "static uint32 wsgDefenderCount", "std::vector<uint32> const vFlagsAB")
+    assert "BG_WS_STATE_CAPTURES_ALLIANCE" in defender_count
+    assert "BG_WS_STATE_CAPTURES_HORDE" in defender_count
+    assert "std::min<uint32>(3" in defender_count
+    assert "std::max<uint32>(1" in defender_count
+    assert "? 6 : 3" not in defender_count
+    assert "bool IsWsgFlagRunner" in tactics
+    assert "bool IsWsgEnemyFlagAtBase" in tactics
+    assert "IsActiveEvent(GetTeamIndexByTeamId(enemyFlag), 0)" in tactics
+    assert "bg->GetPlayers()" in tactics
+    assert "player->GetPlayerbotAI()" in tactics
     assert "bothFlagsTaken" in wsg
     assert 'AI_VALUE(Unit*, "enemy flag carrier")' in wsg
     assert 'AI_VALUE(Unit*, "team flag carrier")' in wsg
@@ -53,6 +66,8 @@ def main() -> None:
     assert "GetRandomPoint" in wsg
     assert 'new NextAction("bg protect fc"' in strategy
     assert 'new NextAction("bg move to objective", 80.0f)' in strategy
+    assert '"wsg flag runner"' in strategy
+    assert 'new NextAction("bg move to objective", 85.0f)' in strategy
     assert '"jump::position bg objective"' not in advanced_strategy
     assert '"rocket boots"' not in advanced_strategy
 
@@ -62,9 +77,22 @@ def main() -> None:
         'if (getName() == "move to objective")',
     )
     assert "defenderCount" in execute
+    assert "wsgDefenderCount(bot, bg)" in execute
     assert "role < defenderCount" in execute
     assert "IsInCombat(bot)" in execute
     assert "return protectFC();" in execute
+
+    wsg_objective = section(tactics, "case BATTLEGROUND_WS:", "case BATTLEGROUND_AB:")
+    assert "IsWsgFlagRunner(bot, bg) && IsWsgEnemyFlagAtBase(bot, bg)" in wsg_objective
+
+    move_execute = section(
+        tactics,
+        'if (getName() == "move to objective")',
+        'if (getName() == "use buff")',
+    )
+    assert "wsgFlagRunner" not in move_execute
+    assert 'posMap["wsg corridor objective"]' in move_execute
+    assert "MovementExpired()" in move_execute
 
     start = section(tactics, "bool BGTactics::moveToStart", "bool BGTactics::selectObjective")
     assert "WS_WAITING_POS_HORDE_3" in start
@@ -76,6 +104,11 @@ def main() -> None:
 
     paths = section(tactics, "bool BGTactics::selectObjectiveWp", "bool BGTactics::resetObjective")
     wsg_path_dispatch = paths.split("if (bgType == BATTLEGROUND_WS", 1)[1].split("#ifndef", 1)[0]
+    assert "followWsgCorridor()" in wsg_path_dispatch
+    assert "WsgCorridorResult::Moved" in wsg_path_dispatch
+    assert "WsgCorridorResult::Interrupted" in wsg_path_dispatch
+    assert "interrupted = true" in wsg_path_dispatch
+    assert "if (wsgRoofJump())" in wsg_path_dispatch
     assert "return wsgPaths();" in wsg_path_dispatch
     assert "atAllianceGY" not in wsg_path_dispatch
     assert "atHordeGY" not in wsg_path_dispatch
@@ -83,6 +116,31 @@ def main() -> None:
     assert "closestPointDistanceToBot" in paths
     assert "distanceToDestination" in paths
     assert "chosenReverse ? chosenPoint + 1 : chosenPoint - 1" in paths
+
+    corridor = section(tactics, "WsgCorridorResult BGTactics::followWsgCorridor()", "bool BGTactics::wsgPaths()")
+    assert "bot->GetGUIDLow()" in corridor
+    assert "bot->GetInstanceId()" in corridor
+    assert "routeVariant = routeSeed % 3" in corridor
+    assert "routeStride = 1 + (routeSeed / 3) % 3" in corridor
+    assert "bool towardAlliance = pos.x > 1227.0f" in corridor
+    assert "laneOffset" in corridor
+    assert "vPath_WSG_HordeTunnel_to_AllianceTunnel_1" in corridor
+    assert "vPath_WSG_HordeTunnel_to_AllianceTunnel_2" in corridor
+    assert "vPath_WSG_HordeGYJump_to_AllianceFlagRoom" in corridor
+    assert "vPath_WSG_AllianceGYJump_to_HordeFlagRoom" in corridor
+    assert "urand(" not in corridor
+    assert "frand(" not in corridor
+    assert 'posMap["wsg corridor objective"]' in corridor
+    assert "MovementExpired()" in corridor
+    assert "bot->IsInCombat()" in corridor
+    assert "closestDistance > 50.0f" in corridor
+    assert "IsWsgEnemyFlagAtBase(bot, bg)" in corridor
+    assert "&& !flagTaken()" not in corridor
+
+    wsg_paths = section(tactics, "bool BGTactics::wsgPaths()", "bool BGTactics::wsgRoofJump()")
+    assert "laneOffset" not in wsg_paths
+    assert "moveToLane" not in wsg_paths
+    assert "routePreference" not in wsg_paths
 
     enemy_near = section(
         triggers,
@@ -92,7 +150,7 @@ def main() -> None:
     team_near = section(
         triggers,
         "bool TeamFlagCarrierNear::IsActive()",
-        "bool PlayerWantsInBattlegroundTrigger::IsActive()",
+        "bool WsgFlagRunnerTrigger::IsActive()",
     )
     assert "100.0f" in enemy_near
     assert "bot->GetBattleGroundTypeId() != BATTLEGROUND_WS" in enemy_near
@@ -101,6 +159,24 @@ def main() -> None:
     assert "GetFlagState" not in team_near
     assert team_near.count("GetFlagCarrierGuid") == 2
     assert "200.0f" in team_near
+
+    assert "bool WsgFlagRunnerTrigger::IsActive()" in triggers
+    assert "IsWsgFlagRunner(bot, bg)" in triggers
+    runner = section(
+        triggers,
+        "bool WsgFlagRunnerTrigger::IsActive()",
+        "bool PlayerWantsInBattlegroundTrigger::IsActive()",
+    )
+    assert "bot->IsInCombat()" in runner
+    assert "IsWsgEnemyFlagAtBase(bot, bg)" in runner
+    assert "GetFlagState" not in runner
+    assert "GetFlagCarrierGuid" not in runner
+    assert 'creators["wsg flag runner"]' in TRIGGER_CONTEXT.read_text()
+
+    execute = section(tactics, "bool BGTactics::Execute", "bool BGTactics::moveToStart")
+    assert "bool corridorInterrupted = false" in execute
+    assert "selectObjectiveWp(*vPaths, corridorInterrupted)" in execute
+    assert "if (corridorInterrupted)" in execute
 
 
 if __name__ == "__main__":

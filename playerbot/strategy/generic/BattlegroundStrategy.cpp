@@ -79,6 +79,10 @@ void WarsongStrategy::InitNonCombatTriggers(std::list<TriggerNode*> &triggers)
     if (sPlayerbotAIConfig.advancedBgTactics)
     {
         triggers.push_back(new TriggerNode(
+            "wsg flag runner",
+            NextAction::array(0, new NextAction("bg move to objective", 85.0f), NULL)));
+
+        triggers.push_back(new TriggerNode(
             "team flagcarrier near",
             NextAction::array(0, new NextAction("bg protect fc", 79.0f), NULL)));
 

@@ -4,6 +4,9 @@
 #include "MovementActions.h"
 #include "BattleGround/BattleGround.h"
 #include "BattleGround/BattleGroundMgr.h"
+#include "BattleGround/BattleGroundWS.h"
+#include "Globals/ObjectMgr.h"
+#include "Maps/Map.h"
 #include "BattleGroundTactics.h"
 #include "float.h"
 #ifdef MANGOSBOT_TWO
@@ -76,6 +79,54 @@ enum BattleBotWsgWaitSpot
     BB_WSG_WAIT_SPOT_LEFT,
     BB_WSG_WAIT_SPOT_RIGHT
 };
+
+static uint32 wsgDefenderCount(Player* bot, BattleGround* bg)
+{
+    uint32 teamIndex = GetTeamIndexByTeamId(bot->GetTeam());
+    uint32 strategy = (bot->GetInstanceId() + teamIndex) % 3;
+    uint32 enemyStrategy = (bot->GetInstanceId() + 1 - teamIndex) % 3;
+    uint32 defenderCount = strategy == 2 ? 3 : 2;
+
+    if (enemyStrategy == 2 && defenderCount > 2)
+        defenderCount = 2;
+
+    uint32 ownScoreState = bot->GetTeam() == ALLIANCE ? BG_WS_STATE_CAPTURES_ALLIANCE : BG_WS_STATE_CAPTURES_HORDE;
+    uint32 enemyScoreState = bot->GetTeam() == ALLIANCE ? BG_WS_STATE_CAPTURES_HORDE : BG_WS_STATE_CAPTURES_ALLIANCE;
+    uint32 ownScore = bg->GetBgMap()->GetVariableManager().GetVariable(ownScoreState);
+    uint32 enemyScore = bg->GetBgMap()->GetVariableManager().GetVariable(enemyScoreState);
+
+    if (ownScore > enemyScore)
+        defenderCount = std::min<uint32>(3, defenderCount + 1);
+    else if (ownScore < enemyScore)
+        defenderCount = std::max<uint32>(1, defenderCount - 1);
+
+    return defenderCount;
+}
+
+bool IsWsgFlagRunner(Player* bot, BattleGround* bg)
+{
+    uint32 runnerId = 0;
+    for (auto const& participant : bg->GetPlayers())
+    {
+        if (participant.second.playerTeam != bot->GetTeam())
+            continue;
+
+        Player* player = sObjectMgr.GetPlayer(participant.first);
+        if (!player || !player->IsAlive() || !player->GetPlayerbotAI() || player->GetPlayerbotAI()->IsRealPlayer())
+            continue;
+
+        if (!runnerId || player->GetGUIDLow() < runnerId)
+            runnerId = player->GetGUIDLow();
+    }
+
+    return runnerId == bot->GetGUIDLow();
+}
+
+bool IsWsgEnemyFlagAtBase(Player* bot, BattleGround* bg)
+{
+    Team enemyFlag = bg->GetOtherTeam(bot->GetTeam());
+    return bg->IsActiveEvent(GetTeamIndexByTeamId(enemyFlag), 0);
+}
 
 std::vector<uint32> const vFlagsAB = { BG_AB_BANNER_ALLIANCE , BG_AB_BANNER_CONTESTED_A , BG_AB_BANNER_HORDE , BG_AB_BANNER_CONTESTED_H ,
                                        BG_AB_BANNER_STABLE, BG_AB_BANNER_BLACKSMITH, BG_AB_BANNER_FARM, BG_AB_BANNER_LUMBER_MILL,
@@ -2309,6 +2360,193 @@ static uint32  EY_AttackObjectives[] =
 
 //cross the BattleGround to get to flags or flag carriers
 
+WsgCorridorResult BGTactics::followWsgCorridor()
+{
+    BattleGround* bg = bot->GetBattleGround();
+    ai::PositionMap& posMap = context->GetValue<ai::PositionMap&>("position")->Get();
+    ai::PositionEntry pos = posMap["bg objective"];
+    ai::PositionEntry corridorObjective = posMap["wsg corridor objective"];
+
+    if (!bg || bg->GetStatus() != STATUS_IN_PROGRESS || !bot->IsAlive() || !pos.isSet())
+    {
+        if (corridorObjective.isSet())
+            bot->GetMotionMaster()->MovementExpired();
+        corridorObjective.Reset();
+        posMap["wsg corridor objective"] = corridorObjective;
+        return WsgCorridorResult::Interrupted;
+    }
+
+    if (bot->IsInCombat())
+    {
+        if (corridorObjective.isSet())
+            bot->GetMotionMaster()->MovementExpired();
+        corridorObjective.Reset();
+        posMap["wsg corridor objective"] = corridorObjective;
+        return WsgCorridorResult::Interrupted;
+    }
+
+    auto distanceSquared = [](ai::PositionEntry const& left, ai::PositionEntry const& right)
+    {
+        float dx = left.x - right.x;
+        float dy = left.y - right.y;
+        float dz = left.z - right.z;
+        return dx * dx + dy * dy + dz * dz;
+    };
+
+    if (corridorObjective.isSet() && distanceSquared(corridorObjective, pos) > 25.0f)
+    {
+        bot->GetMotionMaster()->MovementExpired();
+        posMap["wsg corridor objective"] = pos;
+        return WsgCorridorResult::Interrupted;
+    }
+
+    Unit* enemyFC = AI_VALUE(Unit*, "enemy flag carrier");
+    Unit* teamFC = AI_VALUE(Unit*, "team flag carrier");
+    auto followsCarrier = [&](Unit* carrier)
+    {
+        if (!carrier)
+            return false;
+        float dx = pos.x - carrier->GetPositionX();
+        float dy = pos.y - carrier->GetPositionY();
+        float dz = pos.z - carrier->GetPositionZ();
+        return dx * dx + dy * dy + dz * dz < 100.0f;
+    };
+    if (followsCarrier(enemyFC) || followsCarrier(teamFC))
+    {
+        corridorObjective.Reset();
+        posMap["wsg corridor objective"] = corridorObjective;
+        return WsgCorridorResult::Unavailable;
+    }
+
+    if (!corridorObjective.isSet())
+        posMap["wsg corridor objective"] = pos;
+
+    uint32 routeSeed = bot->GetGUIDLow() ^ (bot->GetInstanceId() * 2654435761u);
+    uint32 routeVariant = routeSeed % 3;
+    uint32 routeStride = 1 + (routeSeed / 3) % 3;
+    float laneOffset = (int32((routeSeed / 9) % 5) - 2) * 0.65f;
+    bool towardAlliance = pos.x > 1227.0f;
+    bool flagRunner = IsWsgFlagRunner(bot, bg) && IsWsgEnemyFlagAtBase(bot, bg);
+
+    bool atAllianceGY = bot->GetPositionX() > 1388.0f && bot->GetPositionY() > 1515.0f && bot->GetPositionZ() > 335.0f;
+    bool atHordeGY = bot->GetPositionX() < 1075.0f && bot->GetPositionY() < 1400.0f && bot->GetPositionZ() > 330.0f;
+    if (routeVariant == 2 && towardAlliance && atHordeGY)
+    {
+        if (bot->GetPositionX() < 1043.0f)
+            return MoveTo(bg->GetMapId(), 1045.764f, 1389.831f, 340.825f) ? WsgCorridorResult::Moved : WsgCorridorResult::Unavailable;
+        if (bot->GetPositionX() < 1055.0f)
+            return MoveTo(bg->GetMapId(), 1057.076f, 1393.081f, 339.505f) ? WsgCorridorResult::Moved : WsgCorridorResult::Unavailable;
+
+        JumpAction jump(ai);
+        return jump.JumpTo(WorldPosition(bg->GetMapId(), 1075.233f, 1398.645f, 323.669f))
+            ? WsgCorridorResult::Moved : WsgCorridorResult::Unavailable;
+    }
+    if (routeVariant == 2 && !towardAlliance && atAllianceGY)
+    {
+        if (bot->GetPositionX() > 1408.0f)
+            return MoveTo(bg->GetMapId(), 1407.234f, 1551.658f, 343.432f) ? WsgCorridorResult::Moved : WsgCorridorResult::Unavailable;
+
+        JumpAction jump(ai);
+        return jump.JumpTo(WorldPosition(bg->GetMapId(), 1385.325f, 1544.592f, 322.047f))
+            ? WsgCorridorResult::Moved : WsgCorridorResult::Unavailable;
+    }
+
+    struct WsgCorridorSegment
+    {
+        BattleBotPath* path;
+        bool reverse;
+    };
+    WsgCorridorSegment corridor[3] = {};
+    uint32 corridorSize = routeVariant == 2 ? 2 : 3;
+
+    if (routeVariant == 2)
+    {
+        corridor[0] = towardAlliance
+            ? WsgCorridorSegment{ &vPath_WSG_HordeFlagRoom_to_HordeGraveyard, false }
+            : WsgCorridorSegment{ &vPath_WSG_AllianceFlagRoom_to_AllianceGraveyard, false };
+        corridor[1] = towardAlliance
+            ? WsgCorridorSegment{ &vPath_WSG_HordeGYJump_to_AllianceFlagRoom, false }
+            : WsgCorridorSegment{ &vPath_WSG_AllianceGYJump_to_HordeFlagRoom, false };
+    }
+    else
+    {
+        BattleBotPath* middle = routeVariant == 0
+            ? &vPath_WSG_HordeTunnel_to_AllianceTunnel_1
+            : &vPath_WSG_HordeTunnel_to_AllianceTunnel_2;
+        if (towardAlliance)
+        {
+            corridor[0] = { &vPath_WSG_HordeTunnel_to_HordeFlagRoom, true };
+            corridor[1] = { middle, false };
+            corridor[2] = { &vPath_WSG_AllianceTunnel_to_AllianceFlagRoom, false };
+        }
+        else
+        {
+            corridor[0] = { &vPath_WSG_AllianceTunnel_to_AllianceFlagRoom, true };
+            corridor[1] = { middle, true };
+            corridor[2] = { &vPath_WSG_HordeTunnel_to_HordeFlagRoom, false };
+        }
+    }
+
+    auto waypointAt = [](WsgCorridorSegment const& segment, uint32 logicalPoint) -> BattleBotWaypoint const&
+    {
+        uint32 point = segment.reverse ? segment.path->size() - 1 - logicalPoint : logicalPoint;
+        return segment.path->at(point);
+    };
+
+    uint32 closestSegment = 0;
+    uint32 closestPoint = 0;
+    float closestDistance = FLT_MAX;
+    for (uint32 segmentIndex = 0; segmentIndex < corridorSize; ++segmentIndex)
+    {
+        for (uint32 point = 0; point < corridor[segmentIndex].path->size(); ++point)
+        {
+            BattleBotWaypoint const& waypoint = waypointAt(corridor[segmentIndex], point);
+            float distance = sqrt(bot->GetDistance(waypoint.x, waypoint.y, waypoint.z, DIST_CALC_NONE));
+            if (distance < closestDistance)
+            {
+                closestDistance = distance;
+                closestSegment = segmentIndex;
+                closestPoint = point;
+            }
+        }
+    }
+
+    if (closestDistance > 50.0f)
+        return WsgCorridorResult::Unavailable;
+
+    uint32 targetSegment = closestSegment;
+    uint32 targetPoint = closestPoint;
+    for (uint32 step = 0; step < routeStride; ++step)
+    {
+        if (++targetPoint < corridor[targetSegment].path->size())
+            continue;
+        if (++targetSegment >= corridorSize)
+            return WsgCorridorResult::Unavailable;
+        targetPoint = 0;
+    }
+
+    BattleBotWaypoint const& target = waypointAt(corridor[targetSegment], targetPoint);
+    BattleBotWaypoint const& previous = targetPoint
+        ? waypointAt(corridor[targetSegment], targetPoint - 1)
+        : waypointAt(corridor[targetSegment - 1], corridor[targetSegment - 1].path->size() - 1);
+    float segmentX = target.x - previous.x;
+    float segmentY = target.y - previous.y;
+    float segmentLength = sqrt(segmentX * segmentX + segmentY * segmentY);
+    float targetX = target.x;
+    float targetY = target.y;
+    if (segmentLength > 0.1f)
+    {
+        targetX -= segmentY / segmentLength * laneOffset;
+        targetY += segmentX / segmentLength * laneOffset;
+    }
+
+    if (MoveTo(bg->GetMapId(), targetX, targetY, target.z, false, false, false, flagRunner))
+        return WsgCorridorResult::Moved;
+    if (laneOffset != 0.0f && MoveTo(bg->GetMapId(), target.x, target.y, target.z, false, false, false, flagRunner))
+        return WsgCorridorResult::Moved;
+    return WsgCorridorResult::Unavailable;
+}
+
 bool BGTactics::wsgPaths()
 {
     BattleGround *bg = bot->GetBattleGround();
@@ -2851,12 +3089,7 @@ bool BGTactics::Execute(Event& event)
     if (getName() == "protect fc")
     {
         uint32 role = context->GetValue<uint32>("bg role")->Get();
-        uint32 teamIndex = GetTeamIndexByTeamId(bot->GetTeam());
-        uint32 strategy = (bot->GetInstanceId() + teamIndex) % 3;
-        uint32 enemyStrategy = (bot->GetInstanceId() + 1 - teamIndex) % 3;
-        uint32 defenderCount = strategy == 1 ? 1 : strategy == 2 ? 6 : 3;
-        if (enemyStrategy == 2 && defenderCount > 2)
-            defenderCount = 2;
+        uint32 defenderCount = wsgDefenderCount(bot, bg);
 
         if (role < defenderCount || sServerFacade.IsInCombat(bot))
             return false;
@@ -2882,14 +3115,29 @@ bool BGTactics::Execute(Event& event)
         if (sServerFacade.IsInCombat(bot) && !(bot->HasAura(BG_WS_SPELL_WARSONG_FLAG) || bot->HasAura(BG_WS_SPELL_SILVERWING_FLAG) || bot->HasAura(EY_SPELL_NETHERSTORM_FLAG)))
 #endif
         {
-            //bot->GetMotionMaster()->MovementExpired();
+#ifdef MANGOSBOT_ZERO
+            if (sPlayerbotAIConfig.advancedBgTactics && bgType == BATTLEGROUND_WS)
+            {
+                ai::PositionMap& posMap = context->GetValue<ai::PositionMap&>("position")->Get();
+                ai::PositionEntry corridorObjective = posMap["wsg corridor objective"];
+                if (corridorObjective.isSet())
+                {
+                    bot->GetMotionMaster()->MovementExpired();
+                    corridorObjective.Reset();
+                    posMap["wsg corridor objective"] = corridorObjective;
+                }
+            }
+#endif
             return false;
         }
 
         if (!moveToObjective())
         {
-            if (selectObjectiveWp(*vPaths))
+            bool corridorInterrupted = false;
+            if (selectObjectiveWp(*vPaths, corridorInterrupted))
                 return true;
+            if (corridorInterrupted)
+                return false;
         }
         else
             return true;
@@ -3096,13 +3344,7 @@ bool BGTactics::selectObjective(bool reset)
             bot->HasAura(BG_WS_SPELL_SILVERWING_FLAG);
         uint32 role = context->GetValue<uint32>("bg role")->Get();
 
-        // Stable for the whole match: balanced, offensive, or defensive.
-        uint32 teamIndex = GetTeamIndexByTeamId(bot->GetTeam());
-        uint32 strategy = (bot->GetInstanceId() + teamIndex) % 3;
-        uint32 enemyStrategy = (bot->GetInstanceId() + 1 - teamIndex) % 3;
-        uint32 defenderCount = strategy == 1 ? 1 : strategy == 2 ? 6 : 3;
-        if (enemyStrategy == 2 && defenderCount > 2)
-            defenderCount = 2;
+        uint32 defenderCount = wsgDefenderCount(bot, bg);
         bool defender = role < defenderCount;
 
         auto setRandomPosition = [&](Position const& center, float radius)
@@ -3192,6 +3434,11 @@ bool BGTactics::selectObjective(bool reset)
             }
             else
                 pos.Set(teamFC->GetPositionX(), teamFC->GetPositionY(), teamFC->GetPositionZ(), bot->GetMapId());
+        }
+        else if (IsWsgFlagRunner(bot, bg) && IsWsgEnemyFlagAtBase(bot, bg))
+        {
+            Position const& flagPos = bot->GetTeam() == ALLIANCE ? WS_FLAG_POS_HORDE : WS_FLAG_POS_ALLIANCE;
+            pos.Set(flagPos.x, flagPos.y, flagPos.z, bot->GetMapId());
         }
         else if (defender)
         {
@@ -4161,8 +4408,9 @@ bool BGTactics::moveToObjective()
     return false;
 }
 
-bool BGTactics::selectObjectiveWp(std::vector<BattleBotPath*> const& vPaths)
+bool BGTactics::selectObjectiveWp(std::vector<BattleBotPath*> const& vPaths, bool& interrupted)
 {
+    interrupted = false;
     BattleGround *bg = bot->GetBattleGround();
     if (!bg)
         return false;
@@ -4181,6 +4429,18 @@ bool BGTactics::selectObjectiveWp(std::vector<BattleBotPath*> const& vPaths)
     // use Rym's waypoints for WSG
     if (bgType == BATTLEGROUND_WS/* && (bot->HasAura(BG_WS_SPELL_WARSONG_FLAG) || bot->HasAura(BG_WS_SPELL_SILVERWING_FLAG))*/)
     {
+        if (sPlayerbotAIConfig.advancedBgTactics)
+        {
+            WsgCorridorResult corridorResult = followWsgCorridor();
+            if (corridorResult == WsgCorridorResult::Moved)
+                return true;
+            if (corridorResult == WsgCorridorResult::Interrupted)
+            {
+                interrupted = true;
+                return false;
+            }
+        }
+
         if (wsgRoofJump())
             return true;
 

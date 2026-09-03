@@ -39,6 +39,16 @@ extern std::vector<BattleBotPath*> const vPaths_AV;
 extern std::vector<BattleBotPath*> const vPaths_EY;
 extern std::vector<BattleBotPath*> const vPaths_IC;
 
+bool IsWsgFlagRunner(Player* bot, BattleGround* bg);
+bool IsWsgEnemyFlagAtBase(Player* bot, BattleGround* bg);
+
+enum class WsgCorridorResult
+{
+    Moved,
+    Interrupted,
+    Unavailable
+};
+
 class BGTactics : public MovementAction
 {
 public:
@@ -62,11 +72,12 @@ private:
     bool moveToStart(bool force = false);
     bool selectObjective(bool reset = false);
     bool moveToObjective();
-    bool selectObjectiveWp(std::vector<BattleBotPath*> const& vPaths);
+    bool selectObjectiveWp(std::vector<BattleBotPath*> const& vPaths, bool& interrupted);
     bool moveToObjectiveWp(BattleBotPath* const& currentPath, uint32 currentPoint, bool reverse = false);
     bool startNewPathBegin(std::vector<BattleBotPath*> const& vPaths);
     bool startNewPathFree(std::vector<BattleBotPath*> const& vPaths);
     bool resetObjective();
+    WsgCorridorResult followWsgCorridor();
     bool wsgPaths();
     bool wsgRoofJump();
     bool eotsJump();

@@ -48,6 +48,15 @@ namespace ai
         virtual bool IsActive() override;
     };
 
+    class WsgFlagRunnerTrigger : public Trigger
+    {
+    public:
+        WsgFlagRunnerTrigger(PlayerbotAI* ai) : Trigger(ai, "wsg flag runner") {}
+
+    public:
+        virtual bool IsActive() override;
+    };
+
     class TeamHasFlag : public Trigger
     {
     public:

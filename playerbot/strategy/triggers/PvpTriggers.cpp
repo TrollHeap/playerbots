@@ -3,6 +3,7 @@
 #include "PvpTriggers.h"
 #include "playerbot/ServerFacade.h"
 #include "BattleGround/BattleGroundWS.h"
+#include "playerbot/strategy/actions/BattleGroundTactics.h"
 #include "playerbot/strategy/values/PositionValue.h"
 #ifndef MANGOSBOT_ZERO
 #include "BattleGround/BattleGroundEY.h"
@@ -262,6 +263,19 @@ bool TeamFlagCarrierNear::IsActive()
 
     Unit* carrier = AI_VALUE(Unit*, "team flag carrier");
     return carrier && sServerFacade.IsDistanceLessOrEqualThan(sServerFacade.GetDistance2d(bot, carrier), 200.0f);
+}
+
+bool WsgFlagRunnerTrigger::IsActive()
+{
+    if (!sPlayerbotAIConfig.advancedBgTactics || bot->GetBattleGroundTypeId() != BATTLEGROUND_WS || bot->IsInCombat())
+        return false;
+
+    BattleGroundWS* bg = static_cast<BattleGroundWS*>(bot->GetBattleGround());
+    if (!bg || bg->GetStatus() != STATUS_IN_PROGRESS ||
+        bot->HasAura(BG_WS_SPELL_WARSONG_FLAG) || bot->HasAura(BG_WS_SPELL_SILVERWING_FLAG))
+        return false;
+
+    return IsWsgEnemyFlagAtBase(bot, bg) && IsWsgFlagRunner(bot, bg);
 }
 
 bool PlayerWantsInBattlegroundTrigger::IsActive()

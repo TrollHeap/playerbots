@@ -17,6 +17,9 @@ def main() -> None:
     wsg_paths = source.split("bool BGTactics::wsgPaths()", 1)[1].split(
         "bool BGTactics::wsgRoofJump()", 1
     )[0]
+    corridor = source.split("WsgCorridorResult BGTactics::followWsgCorridor()", 1)[1].split(
+        "bool BGTactics::wsgPaths()", 1
+    )[0]
 
     assert "if (Preference < 4 && !atHordeGY)" in wsg_paths
     assert "else if (atHordeGY || Preference < 7)" in wsg_paths
@@ -34,14 +37,18 @@ def main() -> None:
     assert "MoveTo(bg->GetMapId(), 1076.778076f" not in wsg_paths
     assert "1407.234f, 1551.658f, 343.432f" in wsg_paths
     assert "jump.JumpTo(WorldPosition(bg->GetMapId(), 1385.325f, 1544.592f, 322.047f))" in wsg_paths
+    assert "1045.764f, 1389.831f, 340.825f" in corridor
+    assert "1057.076f, 1393.081f, 339.505f" in corridor
+    assert "1075.233f, 1398.645f, 323.669f" in corridor
+    assert "1407.234f, 1551.658f, 343.432f" in corridor
+    assert "1385.325f, 1544.592f, 322.047f" in corridor
     assert "run down the ramp if the graveyard jump is rejected" in wsg_paths
     ramp = wsg_paths.split(
         "run down the ramp if the graveyard jump is rejected", 1
     )[1].split("if (bot->GetPositionX() < 1227.f)", 1)[0]
     assert ramp.count("return MoveTo(") == 6
     assert (
-        "return MoveTo(bg->GetMapId(), 1031.764282f, 1454.516235f, "
-        "343.337860f);"
+        "return MoveTo(bg->GetMapId(), 1031.764282f, 1454.516235f, 343.337860f);"
         in wsg_paths
     )
 
