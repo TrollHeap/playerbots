@@ -9,13 +9,18 @@ def main() -> None:
     source = (
         ROOT / "playerbot/strategy/actions/CheckMountStateAction.cpp"
     ).read_text()
+    tactics = (
+        ROOT / "playerbot/strategy/actions/BattleGroundTactics.cpp"
+    ).read_text()
+    execute = source[source.index("bool CheckMountStateAction::Execute") : source.index("bool CheckMountStateAction::isUseful")]
     useful = source[source.index("bool CheckMountStateAction::isUseful()") :]
 
-    assert (
-        "bot->GetBattleGroundTypeId() == BATTLEGROUND_WS &&\n"
-        "            bg->GetStatus() == STATUS_WAIT_JOIN)\n"
-        "            return false;"
-    ) in useful
+    assert "bool IsWsgStartingArea(Player* bot)" in tactics
+    assert "GetDistance2d(waitPos.x, waitPos.y)" in tactics
+    assert "if (IsWsgStartingArea(bot))\n        return bot->IsMounted() ? UnMount() : false;" in execute
+    assert "if (IsWsgStartingArea(bot))\n        return bot->IsMounted();" in useful
+    assert "bg->GetStatus() == STATUS_WAIT_JOIN" in tactics
+    assert "fabs(bot->GetPositionZ() - waitPos.z) < 12.0f" in tactics
     assert "GetStartDelayTime() > BG_START_DELAY_30S" not in useful
 
 

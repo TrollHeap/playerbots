@@ -5,6 +5,8 @@
 #include "playerbot/strategy/values/LastMovementValue.h"
 #include "UseItemAction.h"
 
+bool IsWsgStartingArea(Player* bot);
+
 namespace ai
 {
     class CheckMountStateAction : public UseAction 

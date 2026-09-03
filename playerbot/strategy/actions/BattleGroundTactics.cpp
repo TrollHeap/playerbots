@@ -80,6 +80,29 @@ enum BattleBotWsgWaitSpot
     BB_WSG_WAIT_SPOT_RIGHT
 };
 
+bool IsWsgStartingArea(Player* bot)
+{
+    if (!bot || !bot->IsAlive() || !bot->InBattleGround() ||
+        bot->GetBattleGroundTypeId() != BATTLEGROUND_WS)
+        return false;
+
+    BattleGround* bg = bot->GetBattleGround();
+    if (!bg)
+        return false;
+    if (bg->GetStatus() == STATUS_WAIT_JOIN)
+        return true;
+
+    Position const& first = bot->GetTeam() == HORDE ? WS_WAITING_POS_HORDE_1 : WS_WAITING_POS_ALLIANCE_1;
+    Position const& second = bot->GetTeam() == HORDE ? WS_WAITING_POS_HORDE_2 : WS_WAITING_POS_ALLIANCE_2;
+    Position const& third = bot->GetTeam() == HORDE ? WS_WAITING_POS_HORDE_3 : WS_WAITING_POS_ALLIANCE_3;
+    auto nearStart = [bot](Position const& waitPos)
+    {
+        return bot->GetDistance2d(waitPos.x, waitPos.y) < 35.0f &&
+            fabs(bot->GetPositionZ() - waitPos.z) < 12.0f;
+    };
+    return nearStart(first) || nearStart(second) || nearStart(third);
+}
+
 static uint32 wsgDefenderCount(Player* bot, BattleGround* bg)
 {
     uint32 teamIndex = GetTeamIndexByTeamId(bot->GetTeam());
@@ -2424,7 +2447,7 @@ WsgCorridorResult BGTactics::followWsgCorridor()
     uint32 routeSeed = bot->GetGUIDLow() ^ (bot->GetInstanceId() * 2654435761u);
     uint32 routeVariant = routeSeed % 3;
     uint32 routeStride = 1 + (routeSeed / 3) % 3;
-    float laneOffset = (int32((routeSeed / 9) % 5) - 2) * 0.65f;
+    float laneOffset = (int32((routeSeed / 9) % 7) - 3) * 0.80f;
     bool towardAlliance = pos.x > 1227.0f;
     bool flagRunner = IsWsgFlagRunner(bot, bg) && IsWsgEnemyFlagAtBase(bot, bg);
 

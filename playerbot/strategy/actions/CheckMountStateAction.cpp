@@ -16,6 +16,9 @@ bool CheckMountStateAction::Execute(Event& event)
     Player* requester = event.getOwner() ? event.getOwner() : GetMaster();
     Player* groupMaster = ai->GetGroupMaster();
 
+    if (IsWsgStartingArea(bot))
+        return bot->IsMounted() ? UnMount() : false;
+
     if (bot->IsMounted() && (bot->GetTransport() || bot->IsTaxiFlying() || bot->IsBeingTeleported()))
     {
         if (ai->HasStrategy("debug mount", BotState::BOT_STATE_NON_COMBAT))
@@ -259,6 +262,9 @@ bool CheckMountStateAction::isUseful()
     if (!bot->IsInWorld())
         return false;
 
+    if (IsWsgStartingArea(bot))
+        return bot->IsMounted();
+
     bool isOutdoor = bot->GetMap()->GetTerrain()->IsOutdoors(bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ());
     if (!isOutdoor)
         return false;
@@ -290,15 +296,6 @@ bool CheckMountStateAction::isUseful()
         return false;
 }
 
-
-    // Stay unmounted in the battleground preparation area.
-    if (bot->InBattleGround())
-    {
-        BattleGround* bg = bot->GetBattleGround();
-        if (bg && bot->GetBattleGroundTypeId() == BATTLEGROUND_WS &&
-            bg->GetStatus() == STATUS_WAIT_JOIN)
-            return false;
-    }
 
     if (!bot->GetMap()->IsMountAllowed() && bot->GetMapId() != 531)
         return false;

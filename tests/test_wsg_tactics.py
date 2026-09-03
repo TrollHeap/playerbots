@@ -122,6 +122,8 @@ def main() -> None:
     assert "bot->GetInstanceId()" in corridor
     assert "routeVariant = routeSeed % 3" in corridor
     assert "routeStride = 1 + (routeSeed / 3) % 3" in corridor
+    assert "(routeSeed / 9) % 7" in corridor
+    assert "* 0.80f" in corridor
     assert "bool towardAlliance = pos.x > 1227.0f" in corridor
     assert "laneOffset" in corridor
     assert "vPath_WSG_HordeTunnel_to_AllianceTunnel_1" in corridor
