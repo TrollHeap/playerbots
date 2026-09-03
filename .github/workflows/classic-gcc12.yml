@@ -1,0 +1,51 @@
+name: Classic GCC 12
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout Playerbots
+        uses: actions/checkout@v4
+        with:
+          path: playerbots
+
+      - name: Run fork contracts
+        run: make -C playerbots test
+
+      - name: Checkout CMaNGOS Classic
+        uses: actions/checkout@v4
+        with:
+          repository: cmangos/mangos-classic
+          ref: master
+          path: mangos
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-12 g++-12 cmake libssl-dev libmariadb-dev \
+            libboost-all-dev zlib1g-dev libbz2-dev
+
+      - name: Configure
+        env:
+          CC: gcc-12
+          CXX: g++-12
+        run: |
+          cmake -S mangos -B build \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DBUILD_PLAYERBOTS=ON \
+            -DBUILD_AHBOT=ON \
+            -DBUILD_EXTRACTORS=OFF \
+            -DFETCHCONTENT_SOURCE_DIR_PLAYERBOTS="$GITHUB_WORKSPACE/playerbots" \
+            -DPCH=ON
+
+      - name: Build
+        run: cmake --build build --parallel 2

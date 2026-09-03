@@ -572,7 +572,8 @@ std::string PlayerbotLLMInterface::Generate(const std::string& prompt, int timeO
     std::string requestStr = request.str();
     
     if (debug)
-        debugLines.push_back("Send the request: " + requestStr);
+        debugLines.push_back("Send HTTP request: POST " + parsedUrl.path + " " +
+            std::to_string(body.size()) + " bytes");
 
     int write_result;
     if (parsedUrl.https && ssl) {
