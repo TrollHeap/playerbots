@@ -2393,7 +2393,7 @@ WsgCorridorResult BGTactics::followWsgCorridor()
     if (!bg || bg->GetStatus() != STATUS_IN_PROGRESS || !bot->IsAlive() || !pos.isSet())
     {
         if (corridorObjective.isSet())
-            bot->GetMotionMaster()->MovementExpired();
+            ai->StopMoving();
         corridorObjective.Reset();
         posMap["wsg corridor objective"] = corridorObjective;
         return WsgCorridorResult::Interrupted;
@@ -2402,7 +2402,7 @@ WsgCorridorResult BGTactics::followWsgCorridor()
     if (bot->IsInCombat())
     {
         if (corridorObjective.isSet())
-            bot->GetMotionMaster()->MovementExpired();
+            ai->StopMoving();
         corridorObjective.Reset();
         posMap["wsg corridor objective"] = corridorObjective;
         return WsgCorridorResult::Interrupted;
@@ -2418,7 +2418,7 @@ WsgCorridorResult BGTactics::followWsgCorridor()
 
     if (corridorObjective.isSet() && distanceSquared(corridorObjective, pos) > 25.0f)
     {
-        bot->GetMotionMaster()->MovementExpired();
+        ai->StopMoving();
         posMap["wsg corridor objective"] = pos;
         return WsgCorridorResult::Interrupted;
     }
@@ -2427,7 +2427,7 @@ WsgCorridorResult BGTactics::followWsgCorridor()
     Unit* teamFC = AI_VALUE(Unit*, "team flag carrier");
     auto followsCarrier = [&](Unit* carrier)
     {
-        if (!carrier)
+        if (!carrier || carrier == bot)
             return false;
         float dx = pos.x - carrier->GetPositionX();
         float dy = pos.y - carrier->GetPositionY();
@@ -2449,7 +2449,10 @@ WsgCorridorResult BGTactics::followWsgCorridor()
     uint32 routeStride = 1 + (routeSeed / 3) % 3;
     float laneOffset = (int32((routeSeed / 9) % 7) - 3) * 0.80f;
     bool towardAlliance = pos.x > 1227.0f;
-    bool flagRunner = IsWsgFlagRunner(bot, bg) && IsWsgEnemyFlagAtBase(bot, bg);
+    bool carriesEnemyFlag = bot->HasAura(BG_WS_SPELL_WARSONG_FLAG) ||
+        bot->HasAura(BG_WS_SPELL_SILVERWING_FLAG);
+    bool flagRunner = carriesEnemyFlag ||
+        (IsWsgFlagRunner(bot, bg) && IsWsgEnemyFlagAtBase(bot, bg));
 
     bool atAllianceGY = bot->GetPositionX() > 1388.0f && bot->GetPositionY() > 1515.0f && bot->GetPositionZ() > 335.0f;
     bool atHordeGY = bot->GetPositionX() < 1075.0f && bot->GetPositionY() < 1400.0f && bot->GetPositionZ() > 330.0f;
@@ -3145,7 +3148,7 @@ bool BGTactics::Execute(Event& event)
                 ai::PositionEntry corridorObjective = posMap["wsg corridor objective"];
                 if (corridorObjective.isSet())
                 {
-                    bot->GetMotionMaster()->MovementExpired();
+                    ai->StopMoving();
                     corridorObjective.Reset();
                     posMap["wsg corridor objective"] = corridorObjective;
                 }

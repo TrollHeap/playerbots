@@ -92,7 +92,8 @@ def main() -> None:
     )
     assert "wsgFlagRunner" not in move_execute
     assert 'posMap["wsg corridor objective"]' in move_execute
-    assert "MovementExpired()" in move_execute
+    assert "ai->StopMoving()" in move_execute
+    assert "MovementExpired()" not in move_execute
 
     start = section(tactics, "bool BGTactics::moveToStart", "bool BGTactics::selectObjective")
     assert "WS_WAITING_POS_HORDE_3" in start
@@ -133,10 +134,13 @@ def main() -> None:
     assert "urand(" not in corridor
     assert "frand(" not in corridor
     assert 'posMap["wsg corridor objective"]' in corridor
-    assert "MovementExpired()" in corridor
+    assert "ai->StopMoving()" in corridor
+    assert "MovementExpired()" not in corridor
     assert "bot->IsInCombat()" in corridor
     assert "closestDistance > 50.0f" in corridor
     assert "IsWsgEnemyFlagAtBase(bot, bg)" in corridor
+    assert "carrier == bot" in corridor
+    assert "carriesEnemyFlag" in corridor
     assert "&& !flagTaken()" not in corridor
 
     wsg_paths = section(tactics, "bool BGTactics::wsgPaths()", "bool BGTactics::wsgRoofJump()")
