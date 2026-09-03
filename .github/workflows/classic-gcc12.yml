@@ -31,7 +31,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            gcc-12 g++-12 cmake libssl-dev libmariadb-dev \
+            gcc-12 g++-12 cmake libssl-dev libmariadb-dev libmariadb-dev-compat \
             libboost-all-dev zlib1g-dev libbz2-dev
 
       - name: Configure
