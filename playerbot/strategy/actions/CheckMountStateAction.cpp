@@ -291,15 +291,12 @@ bool CheckMountStateAction::isUseful()
 }
 
 
-    // Only mount if BG starts in less than 30 sec
+    // Stay unmounted in the battleground preparation area.
     if (bot->InBattleGround())
     {
         BattleGround* bg = bot->GetBattleGround();
         if (bg && bg->GetStatus() == STATUS_WAIT_JOIN)
-        {
-            if (bg->GetStartDelayTime() > BG_START_DELAY_30S)
-                return false;
-        }
+            return false;
     }
 
     if (!bot->GetMap()->IsMountAllowed() && bot->GetMapId() != 531)
