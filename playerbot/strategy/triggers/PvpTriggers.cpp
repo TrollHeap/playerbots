@@ -253,8 +253,8 @@ bool TeamFlagCarrierNear::IsActive()
         BattleGroundWS* bg = (BattleGroundWS*)bot->GetBattleGround();
         if (bg)
         {
-            bool bothFlagsTaken = bg->GetFlagState(ALLIANCE) != BG_WS_FLAG_STATE_ON_BASE &&
-                bg->GetFlagState(HORDE) != BG_WS_FLAG_STATE_ON_BASE;
+            bool bothFlagsTaken = !bg->GetFlagCarrierGuid(TEAM_INDEX_ALLIANCE).IsEmpty() &&
+                !bg->GetFlagCarrierGuid(TEAM_INDEX_HORDE).IsEmpty();
             if (bothFlagsTaken)
                 return false;
         }

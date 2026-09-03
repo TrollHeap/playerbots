@@ -95,6 +95,8 @@ def main() -> None:
     assert "bot->GetBattleGroundTypeId() != BATTLEGROUND_WS" in enemy_near
     assert "distToEnemy + 15.0f < distToFC" in enemy_near
     assert "bothFlagsTaken" in team_near
+    assert "GetFlagState" not in team_near
+    assert team_near.count("GetFlagCarrierGuid") == 2
     assert "200.0f" in team_near
 
 
