@@ -295,7 +295,8 @@ bool CheckMountStateAction::isUseful()
     if (bot->InBattleGround())
     {
         BattleGround* bg = bot->GetBattleGround();
-        if (bg && bg->GetStatus() == STATUS_WAIT_JOIN)
+        if (bg && bot->GetBattleGroundTypeId() == BATTLEGROUND_WS &&
+            bg->GetStatus() == STATUS_WAIT_JOIN)
             return false;
     }
 

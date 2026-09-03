@@ -11,7 +11,11 @@ def main() -> None:
     ).read_text()
     useful = source[source.index("bool CheckMountStateAction::isUseful()") :]
 
-    assert "bg->GetStatus() == STATUS_WAIT_JOIN)\n            return false;" in useful
+    assert (
+        "bot->GetBattleGroundTypeId() == BATTLEGROUND_WS &&\n"
+        "            bg->GetStatus() == STATUS_WAIT_JOIN)\n"
+        "            return false;"
+    ) in useful
     assert "GetStartDelayTime() > BG_START_DELAY_30S" not in useful
 
 
