@@ -4184,10 +4184,7 @@ bool BGTactics::selectObjectiveWp(std::vector<BattleBotPath*> const& vPaths)
         if (wsgRoofJump())
             return true;
 
-        bool atAllianceGY = bot->GetPositionX() > 1388.f && bot->GetPositionY() > 1515.f && bot->GetPositionZ() > 335.0f;
-        bool atHordeGY = bot->GetPositionY() < 1400.0f && bot->GetPositionX() < 1075.0f && bot->GetPositionZ() > 330.0f;
-        if (!sPlayerbotAIConfig.advancedBgTactics || atAllianceGY || atHordeGY)
-            return wsgPaths();
+        return wsgPaths();
     }
 
 #ifndef MANGOSBOT_ZERO

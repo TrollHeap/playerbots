@@ -21,6 +21,7 @@
 
 #include "BattleGround/BattleGround.h"
 #include "BattleGround/BattleGroundMgr.h"
+#include "BattleGround/BattleGroundWS.h"
 #include "Chat/ChannelMgr.h"
 #include "Guilds/GuildMgr.h"
 #include "World/WorldState.h"
@@ -518,6 +519,32 @@ void RandomPlayerbotMgr::LogPlayerLocation()
 
                     out << (bot->IsInCombat() ? "combat" : "safe") << ",";
                     out << (bot->IsDead() ? (bot->GetCorpse() ? "ghost" : "dead") : "alive") << ",";
+                    out << bot->GetInstanceId() << ",";
+                    if (bot->InBattleGround() && bot->GetPlayerbotAI())
+                        out << bot->GetPlayerbotAI()->GetAiObjectContext()->GetValue<uint32>("bg role")->Get();
+                    out << ",";
+                    out << (bot->HasAura(BG_WS_SPELL_WARSONG_FLAG) ||
+                        bot->HasAura(BG_WS_SPELL_SILVERWING_FLAG) ? "flag" : "no-flag") << ",";
+
+                    uint32 flagCaptures = 0;
+                    uint32 flagReturns = 0;
+                    BattleGround* battleGround = bot->GetBattleGround();
+                    if (battleGround && battleGround->GetTypeId() == BATTLEGROUND_WS)
+                    {
+                        BattleGroundWS* warsong = static_cast<BattleGroundWS*>(battleGround);
+                        for (auto score = warsong->GetPlayerScoresBegin(); score != warsong->GetPlayerScoresEnd(); ++score)
+                        {
+                            flagCaptures += score->second->GetAttr1();
+                            flagReturns += score->second->GetAttr2();
+                        }
+                        out << flagCaptures << "," << flagReturns << ",";
+                        out << (warsong->GetFlagCarrierGuid(TEAM_INDEX_ALLIANCE).IsEmpty() ? "no-carrier" : "carrier") << ",";
+                        out << (warsong->GetFlagCarrierGuid(TEAM_INDEX_HORDE).IsEmpty() ? "no-carrier" : "carrier") << ",";
+                    }
+                    else
+                    {
+                        out << "0,0,no-carrier,no-carrier,";
+                    }
 
                     if (bot->GetGroup())
                         WorldPosition(bot).printWKT({bot, sObjectMgr.GetPlayer(bot->GetGroup()->GetLeaderGuid())}, out, 1);

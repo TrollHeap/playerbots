@@ -75,7 +75,10 @@ def main() -> None:
     assert "urand(0, 99) < 2" in reset
 
     paths = section(tactics, "bool BGTactics::selectObjectiveWp", "bool BGTactics::resetObjective")
-    assert "!sPlayerbotAIConfig.advancedBgTactics || atAllianceGY || atHordeGY" in paths
+    wsg_path_dispatch = paths.split("if (bgType == BATTLEGROUND_WS", 1)[1].split("#ifndef", 1)[0]
+    assert "return wsgPaths();" in wsg_path_dispatch
+    assert "atAllianceGY" not in wsg_path_dispatch
+    assert "atHordeGY" not in wsg_path_dispatch
     assert "chosenPathScore" in paths
     assert "closestPointDistanceToBot" in paths
     assert "distanceToDestination" in paths
