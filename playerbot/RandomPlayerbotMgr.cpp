@@ -430,6 +430,9 @@ void RandomPlayerbotMgr::LogPlayerLocation()
             if (sPlayerbotAIConfig.randomBotAutologin)
             {
                 ForEachPlayerbot([&](Player* bot) {
+                    if (!bot || !bot->IsInWorld() || bot->IsBeingTeleported())
+                        return;
+
                     std::ostringstream out;
                     out << sPlayerbotAIConfig.GetTimestampStr() << "+00,";
                     out << "RND" << ",";
@@ -572,7 +575,7 @@ void RandomPlayerbotMgr::LogPlayerLocation()
             for (auto i : GetPlayers())
             {
                 Player* bot = i.second;
-                if (!bot)
+                if (!bot || !bot->IsInWorld() || bot->IsBeingTeleported())
                     continue;
 
                 std::ostringstream out;

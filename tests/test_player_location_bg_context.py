@@ -4,6 +4,7 @@ from pathlib import Path
 
 source = (Path(__file__).resolve().parents[1] / "playerbot/RandomPlayerbotMgr.cpp").read_text()
 
+assert source.count("if (!bot || !bot->IsInWorld() || bot->IsBeingTeleported())") >= 2
 assert 'out << bot->GetInstanceId() << ",";' in source
 assert 'GetValue<uint32>("bg role")->Get()' in source
 assert 'HasAura(BG_WS_SPELL_WARSONG_FLAG)' in source
