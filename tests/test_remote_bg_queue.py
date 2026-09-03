@@ -10,6 +10,7 @@ def main() -> None:
     config = (ROOT / "playerbot/PlayerbotAIConfig.cpp").read_text()
     config_dist = (ROOT / "playerbot/aiplayerbot.conf.dist.in").read_text()
     manager = (ROOT / "playerbot/PlayerbotMgr.cpp").read_text()
+    random_manager = (ROOT / "playerbot/RandomPlayerbotMgr.cpp").read_text()
     handler_start = manager.index("PlayerbotHolder::HandleRemoteBgQueue")
     handler = manager[
         handler_start : manager.index("PlayerbotHolder::HandleGroup", handler_start)
@@ -36,6 +37,8 @@ def main() -> None:
     assert "InBattleGroundQueueForBattleGroundQueueType(queueTypeId)" in handler
     assert "BgBots[queueTypeId][bracketId][team]++" in handler
     assert "queuePlayer(candidates[bracketId][team][i], true)" in handler
+    assert random_manager.count("BgCheckTimer + 5") == 2
+    assert "BgCheckTimer + 30" not in random_manager
 
 
 if __name__ == "__main__":
