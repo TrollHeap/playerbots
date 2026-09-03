@@ -10,6 +10,7 @@ TRIGGER_CONTEXT = ROOT / "playerbot/strategy/triggers/TriggerContext.h"
 CONFIG_HEADER = ROOT / "playerbot/PlayerbotAIConfig.h"
 CONFIG_SOURCE = ROOT / "playerbot/PlayerbotAIConfig.cpp"
 CONFIG_DIST = ROOT / "playerbot/aiplayerbot.conf.dist.in"
+PLAYERBOT_AI = ROOT / "playerbot/PlayerbotAI.cpp"
 
 
 def section(source: str, start: str, end: str) -> str:
@@ -18,6 +19,7 @@ def section(source: str, start: str, end: str) -> str:
 
 def main() -> None:
     tactics = TACTICS.read_text()
+    playerbot_ai = PLAYERBOT_AI.read_text()
     select_objective = tactics.split("bool BGTactics::selectObjective", 1)[1]
     wsg = section(select_objective, "case BATTLEGROUND_WS:", "case BATTLEGROUND_AB:")
     strategy = section(
@@ -142,6 +144,16 @@ def main() -> None:
     assert "carrier == bot" in corridor
     assert "carriesEnemyFlag" in corridor
     assert "&& !flagTaken()" not in corridor
+
+    update_ai = section(
+        playerbot_ai,
+        "void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)",
+        "void PlayerbotAI::UpdateFaceTarget",
+    )
+    assert "bot->IsStopped()" in update_ai
+    assert "MOVEFLAG_SPLINE_ENABLED" in update_ai
+    assert "!bot->IsTaxiFlying()" in update_ai
+    assert "bot->InterruptMoving(true)" in update_ai
 
     wsg_paths = section(tactics, "bool BGTactics::wsgPaths()", "bool BGTactics::wsgRoofJump()")
     assert "laneOffset" not in wsg_paths
