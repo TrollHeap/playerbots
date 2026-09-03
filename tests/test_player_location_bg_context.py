@@ -15,3 +15,12 @@ assert 'GetAttr1()' in source
 assert 'GetAttr2()' in source
 assert 'GetFlagCarrierGuid(TEAM_INDEX_ALLIANCE)' in source
 assert 'GetFlagCarrierGuid(TEAM_INDEX_HORDE)' in source
+assert source.count("appendMovementState(out, bot);") == 2
+assert "position.getZ()" in source
+assert "position.getHeight()" in source
+assert "position.getZ() - groundZ" in source
+assert '"jump" : "no-jump"' in source
+assert "MOVEFLAG_FALLING" in source
+assert "MOVEFLAG_SPLINE_ENABLED" in source
+assert "bot->IsStopped()" in source
+assert "GetCurrentMovementGeneratorType()" in source

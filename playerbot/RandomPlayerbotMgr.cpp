@@ -427,6 +427,17 @@ void RandomPlayerbotMgr::LogPlayerLocation()
             if (sPlayerbotAIConfig.hasLog("player_route.csv"))
                 sPlayerbotAIConfig.openLog("player_route.csv", "w");
 
+            auto appendMovementState = [](std::ostringstream& out, Player* bot) {
+                WorldPosition position(bot);
+                float groundZ = position.getHeight();
+                out << position.getZ() << "," << groundZ << "," << position.getZ() - groundZ << ",";
+                out << (bot->GetPlayerbotAI() && bot->GetPlayerbotAI()->IsJumping() ? "jump" : "no-jump") << ",";
+                out << (bot->m_movementInfo.HasMovementFlag(MOVEFLAG_FALLING) ? "falling" : "not-falling") << ",";
+                out << (bot->m_movementInfo.HasMovementFlag(MOVEFLAG_SPLINE_ENABLED) ? "spline" : "no-spline") << ",";
+                out << (bot->IsStopped() ? "stopped" : "moving") << ",";
+                out << std::to_string(uint32(bot->GetMotionMaster()->GetCurrentMovementGeneratorType()));
+            };
+
             if (sPlayerbotAIConfig.randomBotAutologin)
             {
                 ForEachPlayerbot([&](Player* bot) {
@@ -552,6 +563,7 @@ void RandomPlayerbotMgr::LogPlayerLocation()
                     if (bot->GetGroup())
                         WorldPosition(bot).printWKT({bot, sObjectMgr.GetPlayer(bot->GetGroup()->GetLeaderGuid())}, out, 1);
 
+                    appendMovementState(out, bot);
                     sPlayerbotAIConfig.log("player_location.csv", out.str().c_str());
 
                     if (sPlayerbotAIConfig.hasLog("player_paths.csv") && WorldPosition(bot))
@@ -615,6 +627,7 @@ void RandomPlayerbotMgr::LogPlayerLocation()
                 if (bot->GetGroup())
                     WorldPosition(bot).printWKT({bot, sObjectMgr.GetPlayer(bot->GetGroup()->GetLeaderGuid())}, out, 1);
 
+                appendMovementState(out, bot);
                 sPlayerbotAIConfig.log("player_location.csv", out.str().c_str());
 
                 if (sPlayerbotAIConfig.hasLog("player_paths.csv") && WorldPosition(bot))
