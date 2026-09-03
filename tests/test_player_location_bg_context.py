@@ -20,7 +20,7 @@ assert "position.getZ()" in source
 assert "position.getHeight()" in source
 assert "position.getZ() - groundZ" in source
 assert '"jump" : "no-jump"' in source
-assert "MOVEFLAG_FALLING" in source
+assert "bot->IsFalling()" in source
 assert "MOVEFLAG_SPLINE_ENABLED" in source
 assert "bot->IsStopped()" in source
 assert "GetCurrentMovementGeneratorType()" in source

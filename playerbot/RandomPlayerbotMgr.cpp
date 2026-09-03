@@ -432,7 +432,7 @@ void RandomPlayerbotMgr::LogPlayerLocation()
                 float groundZ = position.getHeight();
                 out << position.getZ() << "," << groundZ << "," << position.getZ() - groundZ << ",";
                 out << (bot->GetPlayerbotAI() && bot->GetPlayerbotAI()->IsJumping() ? "jump" : "no-jump") << ",";
-                out << (bot->m_movementInfo.HasMovementFlag(MOVEFLAG_FALLING) ? "falling" : "not-falling") << ",";
+                out << (bot->IsFalling() ? "falling" : "not-falling") << ",";
                 out << (bot->m_movementInfo.HasMovementFlag(MOVEFLAG_SPLINE_ENABLED) ? "spline" : "no-spline") << ",";
                 out << (bot->IsStopped() ? "stopped" : "moving") << ",";
                 out << std::to_string(uint32(bot->GetMotionMaster()->GetCurrentMovementGeneratorType()));
