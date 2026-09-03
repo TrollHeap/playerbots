@@ -227,13 +227,41 @@ bool EnemyTeamHasFlag::IsActive()
 bool EnemyFlagCarrierNear::IsActive()
 {
     Unit* carrier = AI_VALUE(Unit*, "enemy flag carrier");
-    return carrier && sServerFacade.IsDistanceLessOrEqualThan(sServerFacade.GetDistance2d(bot, carrier), VISIBILITY_DISTANCE_SMALL);
+    if (!sPlayerbotAIConfig.advancedBgTactics || bot->GetBattleGroundTypeId() != BATTLEGROUND_WS)
+        return carrier && sServerFacade.IsDistanceLessOrEqualThan(
+            sServerFacade.GetDistance2d(bot, carrier), VISIBILITY_DISTANCE_SMALL);
+
+    if (!carrier || !sServerFacade.IsDistanceLessOrEqualThan(sServerFacade.GetDistance2d(bot, carrier), 100.0f))
+        return false;
+
+    Unit* nearbyEnemy = AI_VALUE(Unit*, "enemy player target");
+    if (nearbyEnemy)
+    {
+        float distToFC = sServerFacade.GetDistance2d(bot, carrier);
+        float distToEnemy = sServerFacade.GetDistance2d(bot, nearbyEnemy);
+        if (distToEnemy + 15.0f < distToFC)
+            return false;
+    }
+
+    return true;
 }
 
 bool TeamFlagCarrierNear::IsActive()
 {
+    if (bot->GetBattleGroundTypeId() == BATTLEGROUND_WS)
+    {
+        BattleGroundWS* bg = (BattleGroundWS*)bot->GetBattleGround();
+        if (bg)
+        {
+            bool bothFlagsTaken = bg->GetFlagState(ALLIANCE) != BG_WS_FLAG_STATE_ON_BASE &&
+                bg->GetFlagState(HORDE) != BG_WS_FLAG_STATE_ON_BASE;
+            if (bothFlagsTaken)
+                return false;
+        }
+    }
+
     Unit* carrier = AI_VALUE(Unit*, "team flag carrier");
-    return carrier && sServerFacade.IsDistanceLessOrEqualThan(sServerFacade.GetDistance2d(bot, carrier), VISIBILITY_DISTANCE_SMALL);
+    return carrier && sServerFacade.IsDistanceLessOrEqualThan(sServerFacade.GetDistance2d(bot, carrier), 200.0f);
 }
 
 bool PlayerWantsInBattlegroundTrigger::IsActive()

@@ -184,6 +184,7 @@ public:
     bool randomBotJoinBG;
     bool randomBotAutoJoinBG;
     bool remotePlayerBgQueue;
+    bool advancedBgTactics;
     uint32 randomBotBracketCount;
     bool randomBotLoginAtStartup;
     uint32 randomBotTeleLevel;

@@ -175,6 +175,7 @@ namespace ai
         JumpAction(PlayerbotAI* ai) : MovementAction(ai, "jump"), Qualified() {}
         bool Execute(Event& event) override;
         bool isUseful() override;
+        bool JumpTo(const WorldPosition& dest);
 
         static WorldPosition CalculateJumpParameters(const WorldPosition& src, Unit* jumper, float angle, float vSpeed, float hSpeed, float &timeToLand, float &distanceToLand, float &maxHeight, bool &goodLanding, std::vector<WorldPosition> &path, float maxJumpHeight = sPlayerbotAIConfig.jumpHeightLimit);
 

@@ -1,0 +1,102 @@
+"""Regression contracts for Warsong Gulch tactical decisions."""
+
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+TACTICS = ROOT / "playerbot/strategy/actions/BattleGroundTactics.cpp"
+STRATEGY = ROOT / "playerbot/strategy/generic/BattlegroundStrategy.cpp"
+TRIGGERS = ROOT / "playerbot/strategy/triggers/PvpTriggers.cpp"
+CONFIG_HEADER = ROOT / "playerbot/PlayerbotAIConfig.h"
+CONFIG_SOURCE = ROOT / "playerbot/PlayerbotAIConfig.cpp"
+CONFIG_DIST = ROOT / "playerbot/aiplayerbot.conf.dist.in"
+
+
+def section(source: str, start: str, end: str) -> str:
+    return source.split(start, 1)[1].split(end, 1)[0]
+
+
+def main() -> None:
+    tactics = TACTICS.read_text()
+    select_objective = tactics.split("bool BGTactics::selectObjective", 1)[1]
+    wsg = section(select_objective, "case BATTLEGROUND_WS:", "case BATTLEGROUND_AB:")
+    strategy = section(
+        STRATEGY.read_text(),
+        "void WarsongStrategy::InitNonCombatTriggers",
+        "void WarsongStrategy::InitCombatTriggers",
+    )
+    triggers = TRIGGERS.read_text()
+
+    assert "bool advancedBgTactics;" in CONFIG_HEADER.read_text()
+    assert 'GetBoolDefault("AiPlayerbot.AdvancedBgTactics", false)' in CONFIG_SOURCE.read_text()
+    assert "AiPlayerbot.AdvancedBgTactics = 0" in CONFIG_DIST.read_text()
+    assert "sPlayerbotAIConfig.advancedBgTactics" in wsg
+    legacy_wsg = wsg.split("else if (!sPlayerbotAIConfig.advancedBgTactics)", 1)[1].split(
+        "else if (bothFlagsTaken)", 1
+    )[0]
+    assert "bool supporter = role < 4" in legacy_wsg
+    assert "Follow(teamFC)" in legacy_wsg
+    assert "role > 9" in legacy_wsg
+    assert "GetRandomPoint" in legacy_wsg
+    assert "if (sPlayerbotAIConfig.advancedBgTactics)" in strategy
+    advanced_strategy = strategy.split(
+        "if (sPlayerbotAIConfig.advancedBgTactics)", 1
+    )[1].split("else", 1)[0]
+    assert "bot->GetInstanceId()" in wsg
+    assert "enemyStrategy" in wsg
+    assert "enemyStrategy == 2" in wsg
+    assert "defenderCount" in wsg
+    assert "bothFlagsTaken" in wsg
+    assert 'AI_VALUE(Unit*, "enemy flag carrier")' in wsg
+    assert 'AI_VALUE(Unit*, "team flag carrier")' in wsg
+    assert "WS_FLAG_HIDE_ALLIANCE" in wsg
+    assert "WS_FLAG_HIDE_HORDE" in wsg
+    assert "GetRandomPoint" in wsg
+    assert 'new NextAction("bg protect fc"' in strategy
+    assert 'new NextAction("bg move to objective", 80.0f)' in strategy
+    assert '"jump::position bg objective"' not in advanced_strategy
+    assert '"rocket boots"' not in advanced_strategy
+
+    execute = section(
+        tactics,
+        'if (getName() == "protect fc")',
+        'if (getName() == "move to objective")',
+    )
+    assert "defenderCount" in execute
+    assert "role < defenderCount" in execute
+    assert "IsInCombat(bot)" in execute
+    assert "return protectFC();" in execute
+
+    start = section(tactics, "bool BGTactics::moveToStart", "bool BGTactics::selectObjective")
+    assert "WS_WAITING_POS_HORDE_3" in start
+    assert "WS_WAITING_POS_ALLIANCE_3" in start
+
+    reset = section(tactics, "bool BGTactics::resetObjective", "bool BGTactics::moveToObjectiveWp")
+    assert "advancedBgTactics" in reset
+    assert "urand(0, 99) < 2" in reset
+
+    paths = section(tactics, "bool BGTactics::selectObjectiveWp", "bool BGTactics::resetObjective")
+    assert "!sPlayerbotAIConfig.advancedBgTactics || atAllianceGY || atHordeGY" in paths
+    assert "chosenPathScore" in paths
+    assert "closestPointDistanceToBot" in paths
+    assert "distanceToDestination" in paths
+    assert "chosenReverse ? chosenPoint + 1 : chosenPoint - 1" in paths
+
+    enemy_near = section(
+        triggers,
+        "bool EnemyFlagCarrierNear::IsActive()",
+        "bool TeamFlagCarrierNear::IsActive()",
+    )
+    team_near = section(
+        triggers,
+        "bool TeamFlagCarrierNear::IsActive()",
+        "bool PlayerWantsInBattlegroundTrigger::IsActive()",
+    )
+    assert "100.0f" in enemy_near
+    assert "bot->GetBattleGroundTypeId() != BATTLEGROUND_WS" in enemy_near
+    assert "distToEnemy + 15.0f < distToFC" in enemy_near
+    assert "bothFlagsTaken" in team_near
+    assert "200.0f" in team_near
+
+
+if __name__ == "__main__":
+    main()

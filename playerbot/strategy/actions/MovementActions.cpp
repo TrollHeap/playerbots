@@ -3451,6 +3451,15 @@ bool JumpAction::isUseful()
     return bot->IsInWorld() && ai->HasPlayerNearby() && !ai->IsJumping();
 }
 
+bool JumpAction::JumpTo(const WorldPosition& dest)
+{
+    if (ai->IsJumping())
+        return true;
+
+    return JumpTowards(WorldPosition(bot), dest, bot,
+        bot->GetSpeedRate(MOVE_RUN) * sPlayerbotAIConfig.jumpHSpeed, true);
+}
+
 bool JumpAction::Execute(ai::Event &event)
 {
     // don't jump while casting without real player command

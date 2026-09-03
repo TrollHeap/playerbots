@@ -76,16 +76,29 @@ void WarsongStrategy::InitNonCombatTriggers(std::list<TriggerNode*> &triggers)
         "enemy flagcarrier near",
         NextAction::array(0, new NextAction("attack enemy flag carrier", 80.0f), NULL)));
 
-    triggers.push_back(new TriggerNode(
-        "player has flag",
-        NextAction::array(0,
-            new NextAction("jump::position bg objective", 80.5f),
-            new NextAction("bg move to objective", 80.0f),
-            NULL)));
+    if (sPlayerbotAIConfig.advancedBgTactics)
+    {
+        triggers.push_back(new TriggerNode(
+            "team flagcarrier near",
+            NextAction::array(0, new NextAction("bg protect fc", 79.0f), NULL)));
 
-    triggers.push_back(new TriggerNode(
-        "player has flag",
-        NextAction::array(0, new NextAction("rocket boots", 81.0f), NULL)));
+        triggers.push_back(new TriggerNode(
+            "player has flag",
+            NextAction::array(0, new NextAction("bg move to objective", 80.0f), NULL)));
+    }
+    else
+    {
+        triggers.push_back(new TriggerNode(
+            "player has flag",
+            NextAction::array(0,
+                new NextAction("jump::position bg objective", 80.5f),
+                new NextAction("bg move to objective", 80.0f),
+                NULL)));
+
+        triggers.push_back(new TriggerNode(
+            "player has flag",
+            NextAction::array(0, new NextAction("rocket boots", 81.0f), NULL)));
+    }
 
     triggers.push_back(new TriggerNode(
         "very often",
