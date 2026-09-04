@@ -41,6 +41,7 @@ def main() -> None:
     assert "LLMBotToBotChatChance" not in action_cpp
     assert "detach()" not in action_cpp
     assert "urand(3000, 5000)" in action_cpp
+    assert action_cpp.count("WorldTimer::getMSTime()") == 3
 
     assert "class BotConversationTrigger" in trigger_h
     assert "llmBotConversationInterval" in trigger_h

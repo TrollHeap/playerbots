@@ -351,7 +351,7 @@ bool BotConversationAction::SpeakLine()
     if (spoken)
     {
         ++line;
-        nextLine = getMSTime() + urand(3000, 5000);
+        nextLine = WorldTimer::getMSTime() + urand(3000, 5000);
     }
     return spoken;
 }
@@ -412,7 +412,7 @@ bool BotConversationAction::Execute(Event& event)
         }
         lines = std::move(result.lines);
         line = 0;
-        nextLine = getMSTime();
+        nextLine = WorldTimer::getMSTime();
     }
 
     if (!lines.empty())
@@ -422,7 +422,7 @@ bool BotConversationAction::Execute(Event& event)
             Reset();
             return false;
         }
-        if (getMSTime() < nextLine)
+        if (WorldTimer::getMSTime() < nextLine)
             return true;
         if (!SpeakLine())
         {
