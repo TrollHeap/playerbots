@@ -158,6 +158,11 @@ def main() -> None:
     assert "bot->InterruptMoving(true)" in update_ai
     assert "WSG_MOVEMENT_RECOVERY" not in update_ai
 
+    protect_fc = section(tactics, "bool BGTactics::protectFC()", "bool BGTactics::useBuff()")
+    assert "IsWithinDistInMap(teamFC, 20.0f)" in protect_fc
+    assert "return Follow(teamFC);" not in protect_fc
+    assert "return true;" in protect_fc
+
     wsg_paths = section(tactics, "bool BGTactics::wsgPaths()", "bool BGTactics::wsgRoofJump()")
     assert "laneOffset" not in wsg_paths
     assert "moveToLane" not in wsg_paths

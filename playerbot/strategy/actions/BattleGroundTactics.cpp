@@ -5069,7 +5069,7 @@ bool BGTactics::protectFC()
     if (!bot->IsWithinDistInMap(teamFC, 20.0f))
         return MoveNear(bot->GetMapId(), teamFC->GetPositionX(), teamFC->GetPositionY(), teamFC->GetPositionZ(), 5.0f);
 
-    return Follow(teamFC);
+    return true;
 }
 
 bool BGTactics::useBuff()
