@@ -64,6 +64,21 @@ std::string &trim(std::string &s);
 
 std::set<std::string> PlayerbotAI::unsecuredCommands;
 
+namespace
+{
+    bool IsNaturalGuildInviteRequest(std::string text)
+    {
+        boost::algorithm::to_lower(text);
+        if (text.find("guilde") == std::string::npos)
+            return false;
+        for (char const* request :
+            { "peux m'inviter", "peux-tu m'inviter", "invite-moi", "invite moi", "m'invites" })
+            if (text.find(request) != std::string::npos)
+                return true;
+        return false;
+    }
+}
+
 uint32 PlayerbotChatHandler::extractQuestId(std::string str)
 {
     char* source = (char*)str.c_str();
@@ -1770,6 +1785,15 @@ void PlayerbotAI::HandleBotOutgoingPacket(const WorldPacket& packet)
                 bool isMentioned = message.find(bot->GetName()) != std::string::npos;
 
                 Player* speaker = sObjectMgr.GetPlayer(guid1);
+                if (msgtype == CHAT_MSG_WHISPER && !isFromFreeBot && speaker &&
+                    IsNaturalGuildInviteRequest(message))
+                {
+                    bool invited = DoSpecificAction(
+                        "guild invite", Event("natural guild invite", speaker->GetName(), speaker), true);
+                    TellPlayer(speaker,
+                        invited ? "Invitation de guilde envoyée." : "Je ne peux pas t'inviter dans ma guilde.");
+                    return;
+                }
                 Player* selectedPlayer = speaker && speaker->GetSelectionGuid()
                     ? sObjectMgr.GetPlayer(speaker->GetSelectionGuid())
                     : nullptr;

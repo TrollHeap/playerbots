@@ -17,7 +17,8 @@ def main() -> None:
     assert "selectedPlayer != bot" in targeted
     assert "msgtype == CHAT_MSG_SAY" in targeted
     assert "bot->InBattleGround()" in targeted
-    assert targeted.count("return;") == 1
+    selected_guard = targeted.split("Player* selectedPlayer =", 1)[1]
+    assert selected_guard.count("return;") == 1
 
 
 if __name__ == "__main__":
