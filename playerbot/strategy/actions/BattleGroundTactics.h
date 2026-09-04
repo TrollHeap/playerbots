@@ -41,6 +41,7 @@ extern std::vector<BattleBotPath*> const vPaths_IC;
 
 bool IsWsgFlagRunner(Player* bot, BattleGround* bg);
 bool IsWsgEnemyFlagAtBase(Player* bot, BattleGround* bg);
+int32 GetWsgEscortSlot(Player* bot, BattleGround* bg, Unit* teamFC);
 
 enum class WsgCorridorResult
 {

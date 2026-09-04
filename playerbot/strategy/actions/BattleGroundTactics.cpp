@@ -126,6 +126,42 @@ static uint32 wsgDefenderCount(Player* bot, BattleGround* bg)
     return defenderCount;
 }
 
+int32 GetWsgEscortSlot(Player* bot, BattleGround* bg, Unit* teamFC)
+{
+    if (!bot || !bg || !teamFC || teamFC == bot)
+        return -1;
+
+    uint32 defenderCount = wsgDefenderCount(bot, bg);
+    uint32 role = bot->GetPlayerbotAI()->GetAiObjectContext()->GetValue<uint32>("bg role")->Get();
+    if (role < defenderCount)
+        return -1;
+
+    uint32 escortCount = 2 + (bot->GetInstanceId() + GetTeamIndexByTeamId(bot->GetTeam())) % 3;
+    uint32 slot = 0;
+    for (auto const& participant : bg->GetPlayers())
+    {
+        if (participant.second.playerTeam != bot->GetTeam())
+            continue;
+
+        Player* player = sObjectMgr.GetPlayer(participant.first);
+        if (!player || !player->IsAlive() || player == teamFC)
+            continue;
+
+        PlayerbotAI* candidateAi = player->GetPlayerbotAI();
+        if (!candidateAi || candidateAi->IsRealPlayer())
+            continue;
+
+        uint32 candidateRole = candidateAi->GetAiObjectContext()->GetValue<uint32>("bg role")->Get();
+        if (candidateRole < defenderCount)
+            continue;
+
+        if (player->GetGUIDLow() < bot->GetGUIDLow())
+            ++slot;
+    }
+
+    return slot < escortCount ? int32(slot) : -1;
+}
+
 bool IsWsgFlagRunner(Player* bot, BattleGround* bg)
 {
     uint32 runnerId = 0;
@@ -3116,8 +3152,10 @@ bool BGTactics::Execute(Event& event)
     {
         uint32 role = context->GetValue<uint32>("bg role")->Get();
         uint32 defenderCount = wsgDefenderCount(bot, bg);
+        Unit* teamFC = AI_VALUE(Unit*, "team flag carrier");
+        int32 escortSlot = GetWsgEscortSlot(bot, bg, teamFC);
 
-        if (role < defenderCount || sServerFacade.IsInCombat(bot))
+        if (role < defenderCount || escortSlot < 0 || sServerFacade.IsInCombat(bot))
             return false;
 
         if (!bot->IsMounted() && !sServerFacade.IsInCombat(bot))
@@ -3376,6 +3414,7 @@ bool BGTactics::selectObjective(bool reset)
         Unit* enemyFC = AI_VALUE(Unit*, "enemy flag carrier");
         Unit* teamFC = AI_VALUE(Unit*, "team flag carrier");
         bool bothFlagsTaken = enemyFC && teamFC;
+        int32 escortSlot = GetWsgEscortSlot(bot, bg, teamFC);
 
         if (carriesEnemyFlag)
         {
@@ -3435,7 +3474,7 @@ bool BGTactics::selectObjective(bool reset)
         else if (bothFlagsTaken)
         {
             // Keep a small escort while most of the team recovers its own flag.
-            Unit* target = role < 2 ? teamFC : enemyFC;
+            Unit* target = escortSlot >= 0 ? teamFC : enemyFC;
             pos.Set(target->GetPositionX(), target->GetPositionY(), target->GetPositionZ(), bot->GetMapId());
         }
         else if (enemyFC)
@@ -3451,8 +3490,13 @@ bool BGTactics::selectObjective(bool reset)
                     : WS_FLAG_HIDE_HORDE[role % WS_FLAG_HIDE_HORDE.size()];
                 pos.Set(defendPos.x, defendPos.y, defendPos.z, bot->GetMapId());
             }
-            else
+            else if (escortSlot >= 0)
                 pos.Set(teamFC->GetPositionX(), teamFC->GetPositionY(), teamFC->GetPositionZ(), bot->GetMapId());
+            else
+            {
+                Position const& flagPos = bot->GetTeam() == ALLIANCE ? WS_FLAG_POS_HORDE : WS_FLAG_POS_ALLIANCE;
+                pos.Set(flagPos.x, flagPos.y, flagPos.z, bot->GetMapId());
+            }
         }
         else if (IsWsgFlagRunner(bot, bg) && IsWsgEnemyFlagAtBase(bot, bg))
         {
@@ -5066,8 +5110,24 @@ bool BGTactics::protectFC()
     if (!teamFC || teamFC == bot || bot->IsInCombat())
         return false;
 
+    int32 escortSlot = GetWsgEscortSlot(bot, bg, teamFC);
+    if (escortSlot < 0)
+        return false;
+
     if (!bot->IsWithinDistInMap(teamFC, 20.0f))
-        return MoveNear(bot->GetMapId(), teamFC->GetPositionX(), teamFC->GetPositionY(), teamFC->GetPositionZ(), 5.0f);
+    {
+        float escortAngle = (M_PI_F / 4.0f) * (escortSlot * 2 + 1);
+        float escortDistance = 8.0f + 3.0f * (escortSlot / 2);
+        float escortX = teamFC->GetPositionX() + cos(escortAngle) * escortDistance;
+        float escortY = teamFC->GetPositionY() + sin(escortAngle) * escortDistance;
+        float escortZ = teamFC->GetPositionZ();
+
+        if (bot->IsWithinLOS(escortX, escortY, escortZ + bot->GetCollisionHeight(), true) &&
+            MoveTo(bot->GetMapId(), escortX, escortY, escortZ))
+            return true;
+
+        return MoveNear(teamFC, escortDistance);
+    }
 
     return true;
 }

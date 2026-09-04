@@ -249,20 +249,17 @@ bool EnemyFlagCarrierNear::IsActive()
 
 bool TeamFlagCarrierNear::IsActive()
 {
-    if (bot->GetBattleGroundTypeId() == BATTLEGROUND_WS)
+    Unit* carrier = AI_VALUE(Unit*, "team flag carrier");
+    if (!carrier)
+        return false;
+
+    if (sPlayerbotAIConfig.advancedBgTactics && bot->GetBattleGroundTypeId() == BATTLEGROUND_WS)
     {
-        BattleGroundWS* bg = (BattleGroundWS*)bot->GetBattleGround();
-        if (bg)
-        {
-            bool bothFlagsTaken = !bg->GetFlagCarrierGuid(TEAM_INDEX_ALLIANCE).IsEmpty() &&
-                !bg->GetFlagCarrierGuid(TEAM_INDEX_HORDE).IsEmpty();
-            if (bothFlagsTaken)
-                return false;
-        }
+        BattleGround* bg = bot->GetBattleGround();
+        return bg && GetWsgEscortSlot(bot, bg, carrier) >= 0;
     }
 
-    Unit* carrier = AI_VALUE(Unit*, "team flag carrier");
-    return carrier && sServerFacade.IsDistanceLessOrEqualThan(sServerFacade.GetDistance2d(bot, carrier), 200.0f);
+    return sServerFacade.IsDistanceLessOrEqualThan(sServerFacade.GetDistance2d(bot, carrier), 200.0f);
 }
 
 bool WsgFlagRunnerTrigger::IsActive()

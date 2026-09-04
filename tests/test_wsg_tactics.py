@@ -4,6 +4,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TACTICS = ROOT / "playerbot/strategy/actions/BattleGroundTactics.cpp"
+TACTICS_HEADER = ROOT / "playerbot/strategy/actions/BattleGroundTactics.h"
 STRATEGY = ROOT / "playerbot/strategy/generic/BattlegroundStrategy.cpp"
 TRIGGERS = ROOT / "playerbot/strategy/triggers/PvpTriggers.cpp"
 TRIGGER_CONTEXT = ROOT / "playerbot/strategy/triggers/TriggerContext.h"
@@ -19,6 +20,7 @@ def section(source: str, start: str, end: str) -> str:
 
 def main() -> None:
     tactics = TACTICS.read_text()
+    tactics_header = TACTICS_HEADER.read_text()
     playerbot_ai = PLAYERBOT_AI.read_text()
     assert '#include "Movement/MoveSpline.h"' not in playerbot_ai
     select_objective = tactics.split("bool BGTactics::selectObjective", 1)[1]
@@ -157,8 +159,27 @@ def main() -> None:
     assert "WSG_MOVEMENT_RECOVERY" not in update_ai
 
     protect_fc = section(tactics, "bool BGTactics::protectFC()", "bool BGTactics::useBuff()")
+    protect_fc_compact = " ".join(protect_fc.split())
+    escort_slot = section(tactics, "int32 GetWsgEscortSlot", "bool IsWsgFlagRunner")
+    assert "int32 GetWsgEscortSlot(Player* bot, BattleGround* bg, Unit* teamFC);" in tactics_header
+    assert "escortCount = 2 +" in escort_slot
+    assert "% 3" in escort_slot
+    assert "bg->GetPlayers()" in escort_slot
+    assert 'GetValue<uint32>("bg role")' in escort_slot
+    assert "candidateRole < defenderCount" in escort_slot
+    assert "player->GetGUIDLow() < bot->GetGUIDLow()" in escort_slot
+    assert "GetWsgEscortSlot(bot, bg, teamFC)" in execute
+    assert "escortSlot < 0" in execute
     assert "IsWithinDistInMap(teamFC, 20.0f)" in protect_fc
+    assert "M_PI_F / 4.0f" in protect_fc
+    assert "escortSlot * 2 + 1" in protect_fc
+    assert "8.0f + 3.0f" in protect_fc
+    assert "if (bot->IsWithinLOS" in protect_fc_compact
+    assert "&& MoveTo(bot->GetMapId(), escortX, escortY" in protect_fc_compact
+    assert "return MoveNear(teamFC, escortDistance);" in protect_fc
     assert "return Follow(teamFC);" not in protect_fc
+    assert "urand(" not in protect_fc
+    assert "frand(" not in protect_fc
     assert "return true;" in protect_fc
 
     wsg_paths = section(tactics, "bool BGTactics::wsgPaths()", "bool BGTactics::wsgRoofJump()")
@@ -179,10 +200,17 @@ def main() -> None:
     assert "100.0f" in enemy_near
     assert "bot->GetBattleGroundTypeId() != BATTLEGROUND_WS" in enemy_near
     assert "distToEnemy + 15.0f < distToFC" in enemy_near
-    assert "bothFlagsTaken" in team_near
-    assert "GetFlagState" not in team_near
-    assert team_near.count("GetFlagCarrierGuid") == 2
+    assert "bothFlagsTaken" not in team_near
+    assert "GetWsgEscortSlot(bot, bg, carrier) >= 0" in team_near
     assert "200.0f" in team_near
+
+    assert "int32 escortSlot = GetWsgEscortSlot(bot, bg, teamFC);" in wsg_objective
+    both_flags = section(wsg_objective, "else if (bothFlagsTaken)", "else if (enemyFC)")
+    assert "escortSlot >= 0 ? teamFC : enemyFC" in both_flags
+    own_carrier = section(wsg_objective, "else if (teamFC)", "else if (IsWsgFlagRunner")
+    assert "else if (escortSlot >= 0)" in own_carrier
+    assert "WS_FLAG_POS_HORDE" in own_carrier
+    assert "WS_FLAG_POS_ALLIANCE" in own_carrier
 
     assert "bool WsgFlagRunnerTrigger::IsActive()" in triggers
     assert "IsWsgFlagRunner(bot, bg)" in triggers
