@@ -3373,13 +3373,6 @@ bool BGTactics::selectObjective(bool reset)
         uint32 defenderCount = wsgDefenderCount(bot, bg);
         bool defender = role < defenderCount;
 
-        auto setRandomPosition = [&](Position const& center, float radius)
-        {
-            float x, y, z;
-            bot->GetRandomPoint(center.x, center.y, center.z, radius, x, y, z);
-            pos.Set(x, y, z, bot->GetMapId());
-        };
-
         Unit* enemyFC = AI_VALUE(Unit*, "enemy flag carrier");
         Unit* teamFC = AI_VALUE(Unit*, "team flag carrier");
         bool bothFlagsTaken = enemyFC && teamFC;
@@ -3456,7 +3449,7 @@ bool BGTactics::selectObjective(bool reset)
                 Position const& defendPos = bot->GetTeam() == ALLIANCE
                     ? WS_FLAG_HIDE_ALLIANCE[role % WS_FLAG_HIDE_ALLIANCE.size()]
                     : WS_FLAG_HIDE_HORDE[role % WS_FLAG_HIDE_HORDE.size()];
-                setRandomPosition(defendPos, 5.0f);
+                pos.Set(defendPos.x, defendPos.y, defendPos.z, bot->GetMapId());
             }
             else
                 pos.Set(teamFC->GetPositionX(), teamFC->GetPositionY(), teamFC->GetPositionZ(), bot->GetMapId());
@@ -3471,7 +3464,7 @@ bool BGTactics::selectObjective(bool reset)
             Position const& defendPos = bot->GetTeam() == ALLIANCE
                 ? WS_FLAG_HIDE_ALLIANCE[role % WS_FLAG_HIDE_ALLIANCE.size()]
                 : WS_FLAG_HIDE_HORDE[role % WS_FLAG_HIDE_HORDE.size()];
-            setRandomPosition(defendPos, 5.0f);
+            pos.Set(defendPos.x, defendPos.y, defendPos.z, bot->GetMapId());
         }
         else
         {

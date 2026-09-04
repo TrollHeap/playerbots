@@ -144,6 +144,8 @@ def main() -> None:
     assert "carrier == bot" in corridor
     assert "carriesEnemyFlag" in corridor
     assert "&& !flagTaken()" not in corridor
+    assert "setRandomPosition" not in wsg
+    assert "pos.Set(defendPos.x, defendPos.y, defendPos.z" in wsg
 
     update_ai = section(
         playerbot_ai,
@@ -154,13 +156,7 @@ def main() -> None:
     assert "MOVEFLAG_SPLINE_ENABLED" in update_ai
     assert "!bot->IsTaxiFlying()" in update_ai
     assert "bot->InterruptMoving(true)" in update_ai
-    assert "WSG_MOVEMENT_RECOVERY" in update_ai
-    assert "bg->GetTypeId() == BATTLEGROUND_WS" in update_ai
-    assert "ground_z=%.2f" in update_ai
-    assert "spline_after=%u" in update_ai
-    assert update_ai.index("bot->InterruptMoving(true)") < update_ai.index(
-        "WSG_MOVEMENT_RECOVERY"
-    )
+    assert "WSG_MOVEMENT_RECOVERY" not in update_ai
 
     wsg_paths = section(tactics, "bool BGTactics::wsgPaths()", "bool BGTactics::wsgRoofJump()")
     assert "laneOffset" not in wsg_paths

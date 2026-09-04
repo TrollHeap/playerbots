@@ -280,23 +280,7 @@ void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)
 
     if (!bot->IsTaxiFlying() && bot->IsStopped() &&
         bot->m_movementInfo.HasMovementFlag(MOVEFLAG_SPLINE_ENABLED))
-    {
-        BattleGround* bg = bot->GetBattleGround();
-        bool traceWsgRecovery = bg && bg->GetTypeId() == BATTLEGROUND_WS;
         bot->InterruptMoving(true);
-
-        if (traceWsgRecovery)
-        {
-            WorldPosition position(bot);
-            float groundZ = position.getHeight();
-            sLog.outString("WSG_MOVEMENT_RECOVERY bot=%s instance=%u x=%.2f y=%.2f z=%.2f ground_z=%.2f dz=%.2f spline_after=%u stopped_after=%u motion=%u",
-                bot->GetName(), bot->GetInstanceId(), position.getX(), position.getY(), position.getZ(), groundZ,
-                position.getZ() - groundZ,
-                bot->m_movementInfo.HasMovementFlag(MOVEFLAG_SPLINE_ENABLED) ? 1u : 0u,
-                bot->IsStopped() ? 1u : 0u,
-                uint32(bot->GetMotionMaster()->GetCurrentMovementGeneratorType()));
-        }
-    }
 
     // Leontiesh - fix movement desync
     bool botMoving = false;
