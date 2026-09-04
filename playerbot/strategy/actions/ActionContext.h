@@ -315,6 +315,7 @@ namespace ai
             creators["rpg buy petition"] = [](PlayerbotAI* ai) { return new RpgBuyPetitionAction(ai); };
             creators["rpg use"] = [](PlayerbotAI* ai) { return new RpgUseAction(ai); };
             creators["rpg ai chat"] = [](PlayerbotAI* ai) { return new RpgAIChatAction(ai); };
+            creators["bot conversation"] = [](PlayerbotAI* ai) { return new BotConversationAction(ai); };
             creators["rpg spell"] = [](PlayerbotAI* ai) { return new RpgSpellAction(ai); };
             creators["rpg spell click"] = [](PlayerbotAI* ai) { return new RpgSpellClickAction(ai); };
             creators["rpg craft"] = [](PlayerbotAI* ai) { return new RpgCraftAction(ai); };

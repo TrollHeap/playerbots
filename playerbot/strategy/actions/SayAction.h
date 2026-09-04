@@ -3,6 +3,13 @@
 #include "playerbot/strategy/Action.h"
 #include "QuestAction.h"
 
+#include <atomic>
+#include <future>
+#include <map>
+#include <mutex>
+
+struct ParsedUrl;
+
 namespace ai
 {
     class SayAction : public Action, public Qualified
@@ -20,6 +27,57 @@ namespace ai
     typedef std::pair<WorldPacket, uint32> delayedPacket;
     typedef std::vector<delayedPacket> delayedPackets;
     typedef std::future<delayedPackets> futurePackets;
+
+    struct BotConversationLine
+    {
+        std::string speaker;
+        std::string message;
+    };
+
+    struct BotConversationResult
+    {
+        std::vector<BotConversationLine> lines;
+    };
+
+    class BotConversationAction : public Action
+    {
+    public:
+        BotConversationAction(PlayerbotAI* ai) : Action(ai, "bot conversation") {}
+        virtual ~BotConversationAction();
+        virtual bool Execute(Event& event) override;
+        virtual bool isUseful() override { return true; }
+        bool IsPending() const;
+        bool CanStart();
+        void Cancel();
+
+    private:
+        enum class Channel : uint8 { NONE, SAY, GUILD, PARTY, RAID, BATTLEGROUND };
+
+        bool ValidateScene() const;
+        bool SpeakLine();
+        std::string BuildRequest(Player* observer, Player* other) const;
+        static BotConversationResult Generate(const std::string& json, const ParsedUrl& endpoint,
+            const std::string& first, const std::string& second, uint32 timeoutSeconds);
+        static void ReapAbandonedFutures();
+        void Reset();
+
+        Channel channel = Channel::NONE;
+        uint32 observerGuid = 0;
+        uint32 otherGuid = 0;
+        time_t expires = 0;
+        uint32 nextLine = 0;
+        bool prepared = false;
+        bool canceled = false;
+        bool ownsFlight = false;
+        std::future<BotConversationResult> future;
+        std::vector<BotConversationLine> lines;
+        size_t line = 0;
+
+        static std::atomic<bool> inFlight;
+        static std::mutex cooldownMutex;
+        static std::map<uint32, time_t> observerCooldowns;
+        static std::vector<std::future<BotConversationResult>> abandonedFutures;
+    };
 
     class ChatReplyAction : public Action
     {

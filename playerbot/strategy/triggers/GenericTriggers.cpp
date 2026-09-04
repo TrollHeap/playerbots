@@ -5,10 +5,28 @@
 #include "playerbot/PlayerbotAIConfig.h"
 #include "playerbot/strategy/values/PositionValue.h"
 #include "playerbot/strategy/values/AoeValues.h"
+#include "playerbot/strategy/actions/SayAction.h"
 
 #include <regex>
 
 using namespace ai;
+
+bool BotConversationTrigger::IsActive()
+{
+    BotConversationAction* action = static_cast<BotConversationAction*>(
+        ai->GetAiObjectContext()->GetAction("bot conversation"));
+    if (!action)
+        return false;
+    if (sPlayerbotAIConfig.llmEnabled <= 0)
+    {
+        action->Cancel();
+        return false;
+    }
+    if (action->IsPending())
+        return true;
+    return sPlayerbotAIConfig.llmBotConversationChance > 0 &&
+        urand(0, 99) < sPlayerbotAIConfig.llmBotConversationChance && action->CanStart();
+}
 
 bool NoManaTrigger::IsActive()
 {

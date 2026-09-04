@@ -723,6 +723,10 @@ bool PlayerbotAIConfig::Initialize()
     llmGlobalContext = config.GetBoolDefault("AiPlayerbot.LLMGlobalContext", false);
     llmBotToBotChatChance = config.GetIntDefault("AiPlayerbot.LLMBotToBotChatChance", 0);
     llmRpgAIChatChance = config.GetIntDefault("AiPlayerbot.LLMRpgAIChatChance", 100);
+    llmBotConversationChance = config.GetIntDefault("AiPlayerbot.LLMBotConversationChance", 0);
+    llmBotConversationInterval = config.GetIntDefault("AiPlayerbot.LLMBotConversationInterval", 30);
+    llmBotConversationCooldown = config.GetIntDefault("AiPlayerbot.LLMBotConversationCooldown", 300);
+    llmBotConversationExpiration = config.GetIntDefault("AiPlayerbot.LLMBotConversationExpiration", 20);
 
     std::list<std::string> blockedChannels;
     LoadListString<std::list<std::string>>(config.GetStringDefault("AiPlayerbot.LLMBlockedReplyChannels", ""), blockedChannels);

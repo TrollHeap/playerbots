@@ -1291,6 +1291,14 @@ namespace ai
 
         bool IsActive() override;
     };
+
+    class BotConversationTrigger : public Trigger
+    {
+    public:
+        BotConversationTrigger(PlayerbotAI* ai) : Trigger(ai, "bot conversation",
+            sPlayerbotAIConfig.llmBotConversationInterval ? sPlayerbotAIConfig.llmBotConversationInterval : 30) {}
+        virtual bool IsActive() override;
+    };
 }
 
 class PotionCooldownTrigger : public ai::ItemBuffReadyTrigger

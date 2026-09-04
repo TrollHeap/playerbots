@@ -1768,7 +1768,15 @@ void PlayerbotAI::HandleBotOutgoingPacket(const WorldPacket& packet)
                 }
 
                 bool isMentioned = message.find(bot->GetName()) != std::string::npos;
-                
+
+                Player* speaker = sObjectMgr.GetPlayer(guid1);
+                Player* selectedPlayer = speaker && speaker->GetSelectionGuid()
+                    ? sObjectMgr.GetPlayer(speaker->GetSelectionGuid())
+                    : nullptr;
+                if (isAiChat && bot->InBattleGround() && msgtype == CHAT_MSG_SAY && !isFromFreeBot &&
+                    selectedPlayer && selectedPlayer->GetPlayerbotAI() &&
+                    !selectedPlayer->GetPlayerbotAI()->IsRealPlayer() && selectedPlayer != bot)
+                    return;
 
                 ChatChannelSource chatChannelSource = GetChatChannelSource(bot, msgtype, chanName);
 

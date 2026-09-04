@@ -370,7 +370,11 @@ std::string GetSSLError() {
     return std::string(err_buf);
 }
 
-std::string PlayerbotLLMInterface::Generate(const std::string& prompt, int timeOutSeconds, int maxGenerations, std::vector<std::string> & debugLines) {
+std::string PlayerbotLLMInterface::Generate(const std::string& prompt, int timeOutSeconds, int maxGenerations, std::vector<std::string>& debugLines) {
+    return GenerateAt(prompt, sPlayerbotAIConfig.llmEndPointUrl, timeOutSeconds, maxGenerations, debugLines);
+}
+
+std::string PlayerbotLLMInterface::GenerateAt(const std::string& prompt, const ParsedUrl& endpoint, int timeOutSeconds, int maxGenerations, std::vector<std::string>& debugLines) {
     bool debug = !debugLines.empty();
 
     if (sPlayerbotLLMInterface.generationCount > maxGenerations)
@@ -400,7 +404,7 @@ std::string PlayerbotLLMInterface::Generate(const std::string& prompt, int timeO
     }
 #endif
 
-    ParsedUrl parsedUrl = sPlayerbotAIConfig.llmEndPointUrl;
+    ParsedUrl parsedUrl = endpoint;
 
     if (debug)
         debugLines.push_back("Resolve hostname to IP address: " + parsedUrl.hostname + " " + std::to_string(parsedUrl.port));
