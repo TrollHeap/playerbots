@@ -170,10 +170,11 @@ def main() -> None:
     assert "player->GetGUIDLow() < bot->GetGUIDLow()" in escort_slot
     assert "GetWsgEscortSlot(bot, bg, teamFC)" in execute
     assert "escortSlot < 0" in execute
-    assert "IsWithinDistInMap(teamFC, 20.0f)" in protect_fc
+    assert "IsWithinDistInMap(teamFC, 20.0f)" not in protect_fc
     assert "M_PI_F / 4.0f" in protect_fc
     assert "escortSlot * 2 + 1" in protect_fc
     assert "8.0f + 3.0f" in protect_fc
+    assert "GetDistance2d(bot, escortX, escortY) > 3.0f" in protect_fc
     assert "if (bot->IsWithinLOS" in protect_fc_compact
     assert "&& MoveTo(bot->GetMapId(), escortX, escortY" in protect_fc_compact
     assert "return MoveNear(teamFC, escortDistance);" in protect_fc

@@ -5114,14 +5114,14 @@ bool BGTactics::protectFC()
     if (escortSlot < 0)
         return false;
 
-    if (!bot->IsWithinDistInMap(teamFC, 20.0f))
-    {
-        float escortAngle = (M_PI_F / 4.0f) * (escortSlot * 2 + 1);
-        float escortDistance = 8.0f + 3.0f * (escortSlot / 2);
-        float escortX = teamFC->GetPositionX() + cos(escortAngle) * escortDistance;
-        float escortY = teamFC->GetPositionY() + sin(escortAngle) * escortDistance;
-        float escortZ = teamFC->GetPositionZ();
+    float escortAngle = (M_PI_F / 4.0f) * (escortSlot * 2 + 1);
+    float escortDistance = 8.0f + 3.0f * (escortSlot / 2);
+    float escortX = teamFC->GetPositionX() + cos(escortAngle) * escortDistance;
+    float escortY = teamFC->GetPositionY() + sin(escortAngle) * escortDistance;
+    float escortZ = teamFC->GetPositionZ();
 
+    if (sServerFacade.GetDistance2d(bot, escortX, escortY) > 3.0f)
+    {
         if (bot->IsWithinLOS(escortX, escortY, escortZ + bot->GetCollisionHeight(), true) &&
             MoveTo(bot->GetMapId(), escortX, escortY, escortZ))
             return true;
