@@ -427,6 +427,7 @@ public:
     bool IsInCapitalCity();
     ChatChannelSource GetChatChannelSource(Player* bot, uint32 type, std::string channelName);
     bool SayToGuild(std::string msg, bool likePlayer = false);
+    void QueueGuildWelcome(std::string const& name, ObjectGuid joinedGuid);
     bool SayToWorld(std::string msg);
     bool SayToGeneral(std::string msg);
     bool SayToTrade(std::string msg);

@@ -66,16 +66,87 @@ std::set<std::string> PlayerbotAI::unsecuredCommands;
 
 namespace
 {
-    bool IsNaturalGuildInviteRequest(std::string text)
+    enum class NaturalGuildRequest
+    {
+        NONE,
+        INVITE,
+        RECRUITMENT
+    };
+
+    NaturalGuildRequest IsNaturalGuildRequest(std::string text)
     {
         boost::algorithm::to_lower(text);
         if (text.find("guilde") == std::string::npos)
-            return false;
+            return NaturalGuildRequest::NONE;
         for (char const* request :
             { "peux m'inviter", "peux-tu m'inviter", "invite-moi", "invite moi", "m'invites" })
             if (text.find(request) != std::string::npos)
-                return true;
-        return false;
+                return NaturalGuildRequest::INVITE;
+        if (text.find("recrute") != std::string::npos)
+            return NaturalGuildRequest::RECRUITMENT;
+        return NaturalGuildRequest::NONE;
+    }
+
+    class GuildInviterFinder
+    {
+    public:
+        GuildInviterFinder(Guild* value, Player* excluded) : inviter(nullptr), guild(value), except(excluded) {}
+
+        void operator()(Player* member)
+        {
+            if (!inviter && member != except && member->GetPlayerbotAI() &&
+                guild->HasRankRight(member->GetRank(), GR_RIGHT_INVITE))
+                inviter = member;
+        }
+
+        Player* inviter;
+
+    private:
+        Guild* guild;
+        Player* except;
+    };
+
+    time_t GuildWelcomeDelay(uint32 guildId, ObjectGuid joinedGuid)
+    {
+        struct Wave { time_t seen; uint32 next; };
+        static std::map<uint64, Wave> waves;
+        static std::mutex mutex;
+        std::lock_guard<std::mutex> lock(mutex);
+        time_t now = time(nullptr);
+        for (auto i = waves.begin(); i != waves.end();)
+            if (now - i->second.seen > 300)
+                i = waves.erase(i);
+            else
+                ++i;
+        uint64 key = (uint64(guildId) << 32) | joinedGuid.GetCounter();
+        Wave& wave = waves[key];
+        if (now - wave.seen > 30)
+            wave = { now, 0 };
+        wave.seen = now;
+        return now + 2 + 3 * wave.next++;
+    }
+
+    std::string GuildWelcomeText(std::string const& name, uint32 variant)
+    {
+        switch (variant % 16)
+        {
+            case 0: return "Bienvenue " + name + " !";
+            case 1: return "Bienvenue chez nous " + name + " !";
+            case 2: return "Salut " + name + ", bienvenue !";
+            case 3: return "Bienvenue dans la guilde " + name + ".";
+            case 4: return "Yo " + name + ", bienvenue :)";
+            case 5: return "Bienvenue " + name + ", fais comme chez toi.";
+            case 6: return "Content de t'avoir avec nous " + name + ".";
+            case 7: return "Bienvenue " + name + ", ça fait plaisir !";
+            case 8: return "Hé " + name + " ! Bienvenue parmi nous.";
+            case 9: return "Ça fait un de plus, bienvenue " + name + " !";
+            case 10: return "Bienvenue à bord " + name + ".";
+            case 11: return "Salut la recrue, bienvenue " + name + " !";
+            case 12: return "Bienvenue " + name + ", pose tes sacs.";
+            case 13: return "Ah, du renfort ! Bienvenue " + name + ".";
+            case 14: return "Bienvenue " + name + " :)";
+            default: return "Ravi de te voir ici " + name + ", bienvenue !";
+        }
     }
 }
 
@@ -1126,6 +1197,12 @@ void PlayerbotAI::HandleCommands()
 
         std::string command = holder.GetCommand();
         Player* owner = holder.GetOwner();
+        if (!owner && command.find("__guild_welcome ") == 0)
+        {
+            SayToGuild(GuildWelcomeText(command.substr(16), bot->GetGUIDLow()), true);
+            chatCommands.pop();
+            continue;
+        }
         if (!helper.ParseChatCommand(command, owner) && holder.GetType() == CHAT_MSG_WHISPER)
         {
             //ostringstream out; out << "Unknown command " << command;
@@ -1553,6 +1630,29 @@ void PlayerbotAI::HandleBotOutgoingPacket(const WorldPacket& packet)
 
 	switch (packet.GetOpcode())
 	{
+    case SMSG_GUILD_EVENT:
+    {
+        WorldPacket p(packet);
+        p.rpos(0);
+        uint8 eventType = 0;
+        uint8 stringCount = 0;
+        p >> eventType >> stringCount;
+        std::string joinedName;
+        for (uint8 i = 0; i < stringCount; ++i)
+        {
+            std::string value;
+            p >> value;
+            if (!i)
+                joinedName = value;
+        }
+        ObjectGuid joinedGuid;
+        if (p.rpos() + 8 <= p.size())
+            p >> joinedGuid;
+        Player* joined = joinedGuid.IsEmpty() ? nullptr : sObjectMgr.GetPlayer(joinedGuid);
+        if (eventType == GE_JOINED && joined && joined->isRealPlayer() && joined != bot)
+            QueueGuildWelcome(joinedName, joinedGuid);
+        return;
+    }
 	case SMSG_SPELL_FAILURE:
 	{
 		WorldPacket p(packet);
@@ -1785,13 +1885,47 @@ void PlayerbotAI::HandleBotOutgoingPacket(const WorldPacket& packet)
                 bool isMentioned = message.find(bot->GetName()) != std::string::npos;
 
                 Player* speaker = sObjectMgr.GetPlayer(guid1);
+                NaturalGuildRequest guildRequest = IsNaturalGuildRequest(message);
                 if (msgtype == CHAT_MSG_WHISPER && !isFromFreeBot && speaker &&
-                    IsNaturalGuildInviteRequest(message))
+                    guildRequest != NaturalGuildRequest::NONE)
                 {
-                    bool invited = DoSpecificAction(
-                        "guild invite", Event("natural guild invite", speaker->GetName(), speaker), true);
-                    TellPlayer(speaker,
-                        invited ? "Invitation de guilde envoyée." : "Je ne peux pas t'inviter dans ma guilde.");
+                    Guild* guild = bot->GetGuildId() ? sGuildMgr.GetGuildById(bot->GetGuildId()) : nullptr;
+                    if (!guild)
+                    {
+                        TellPlayer(speaker, "Je n'ai pas de guilde.");
+                        return;
+                    }
+                    if (speaker->GetGuildId())
+                    {
+                        TellPlayer(speaker, "Tu es déjà dans une guilde.");
+                        return;
+                    }
+                    if (speaker->GetGuildIdInvited())
+                    {
+                        TellPlayer(speaker, "Tu as déjà une invitation de guilde en attente.");
+                        return;
+                    }
+
+                    Event inviteEvent("natural guild invite", speaker->GetName(), speaker);
+                    bool canInvite = guild->HasRankRight(bot->GetRank(), GR_RIGHT_INVITE);
+                    if (canInvite)
+                    {
+                        bool invited = DoSpecificAction("guild invite", inviteEvent, true);
+                        TellPlayer(speaker, invited
+                            ? (guildRequest == NaturalGuildRequest::RECRUITMENT
+                                ? "Oui, " + guild->GetName() + " recrute. Je t'envoie une invitation."
+                                : "Invitation de guilde envoyée pour " + guild->GetName() + ".")
+                            : "Je ne peux pas t'inviter dans " + guild->GetName() + ".");
+                        return;
+                    }
+
+                    TellPlayer(speaker, "Euh je regarde chez " + guild->GetName() + ", je vais demander.");
+                    GuildInviterFinder finder(guild, bot);
+                    guild->BroadcastWorker(finder, bot);
+                    bool invited = finder.inviter && finder.inviter->GetPlayerbotAI()->DoSpecificAction(
+                        "guild invite", Event("delegated guild invite", speaker->GetName(), speaker), true);
+                    if (!invited)
+                        TellPlayer(speaker, "Personne n'est dispo pour t'inviter là.");
                     return;
                 }
                 Player* selectedPlayer = speaker && speaker->GetSelectionGuid()
@@ -3105,6 +3239,15 @@ bool PlayerbotAI::SayToGuild(std::string msg, bool likePlayer)
     }
 
     return false;
+}
+
+void PlayerbotAI::QueueGuildWelcome(std::string const& name, ObjectGuid joinedGuid)
+{
+    if (name.empty() || !bot->GetGuildId())
+        return;
+    chatCommands.push(ChatCommandHolder(
+        "__guild_welcome " + name, nullptr, CHAT_MSG_GUILD,
+        GuildWelcomeDelay(bot->GetGuildId(), joinedGuid)));
 }
 
 bool PlayerbotAI::SayToWorld(std::string msg)
