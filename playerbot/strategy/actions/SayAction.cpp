@@ -341,7 +341,19 @@ bool BotConversationAction::SpeakLine()
         spoken = speaker->GetPlayerbotAI()->SayToGuild(lines[line].message, true);
     else if (channel == Channel::PARTY)
         spoken = speaker->GetPlayerbotAI()->SayToParty(lines[line].message, true);
-    else if (channel == Channel::RAID || channel == Channel::BATTLEGROUND)
+    else if (channel == Channel::BATTLEGROUND)
+    {
+        Player* observer = sObjectMgr.GetPlayer(ObjectGuid(HIGHGUID_PLAYER, observerGuid));
+        if (IsHumanWitness(observer))
+        {
+            WorldPacket data;
+            ChatHandler::BuildChatPacket(data, CHAT_MSG_RAID, lines[line].message.c_str(), LANG_UNIVERSAL,
+                CHAT_TAG_NONE, speaker->GetObjectGuid(), speaker->GetName());
+            sServerFacade.SendPacket(observer, data);
+            spoken = true;
+        }
+    }
+    else if (channel == Channel::RAID)
         spoken = speaker->GetPlayerbotAI()->SayToRaid(lines[line].message);
     else
     {

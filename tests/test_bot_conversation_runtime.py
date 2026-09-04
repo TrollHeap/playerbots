@@ -42,6 +42,15 @@ def main() -> None:
     assert "detach()" not in action_cpp
     assert "urand(3000, 5000)" in action_cpp
     assert action_cpp.count("WorldTimer::getMSTime()") == 3
+    speak = action_cpp.split("bool BotConversationAction::SpeakLine()", 1)[1].split(
+        "void BotConversationAction::Reset()", 1
+    )[0]
+    battleground_delivery = speak.split("else if (channel == Channel::BATTLEGROUND)", 1)[1].split(
+        "else if", 1
+    )[0]
+    assert "observerGuid" in battleground_delivery
+    assert "sServerFacade.SendPacket(observer, data)" in battleground_delivery
+    assert "SayToRaid" not in battleground_delivery
 
     assert "class BotConversationTrigger" in trigger_h
     assert "llmBotConversationInterval" in trigger_h
