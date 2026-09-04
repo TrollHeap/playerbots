@@ -20,7 +20,7 @@ def section(source: str, start: str, end: str) -> str:
 def main() -> None:
     tactics = TACTICS.read_text()
     playerbot_ai = PLAYERBOT_AI.read_text()
-    assert '#include "Movement/MoveSpline.h"' in playerbot_ai
+    assert '#include "Movement/MoveSpline.h"' not in playerbot_ai
     select_objective = tactics.split("bool BGTactics::selectObjective", 1)[1]
     wsg = section(select_objective, "case BATTLEGROUND_WS:", "case BATTLEGROUND_AB:")
     strategy = section(
@@ -153,11 +153,7 @@ def main() -> None:
         "void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)",
         "void PlayerbotAI::UpdateFaceTarget",
     )
-    assert "bot->IsStopped()" in update_ai
-    assert "!bot->movespline->Finalized()" in update_ai
-    assert "MOVEFLAG_SPLINE_ENABLED" not in update_ai
-    assert "!bot->IsTaxiFlying()" in update_ai
-    assert "bot->InterruptMoving(true)" in update_ai
+    assert "!bot->movespline->Finalized()" not in update_ai
     assert "WSG_MOVEMENT_RECOVERY" not in update_ai
 
     protect_fc = section(tactics, "bool BGTactics::protectFC()", "bool BGTactics::useBuff()")

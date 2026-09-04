@@ -27,7 +27,6 @@
 #include "strategy/values/PositionValue.h"
 #include "playerbot/ServerFacade.h"
 #include "playerbot/TravelMgr.h"
-#include "Movement/MoveSpline.h"
 #include "Movement/MoveSplineInitArgs.h"
 #include "Maps/InstanceData.h"
 #include "ChatHelper.h"
@@ -278,9 +277,6 @@ void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)
             TellPlayer(GetMaster(), BOT_TEXT("logout_cancel"));
         }
     }
-
-    if (!bot->IsTaxiFlying() && bot->IsStopped() && !bot->movespline->Finalized())
-        bot->InterruptMoving(true);
 
     // Leontiesh - fix movement desync
     bool botMoving = false;
