@@ -278,8 +278,7 @@ void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)
         }
     }
 
-    if (!bot->IsTaxiFlying() && bot->IsStopped() &&
-        bot->m_movementInfo.HasMovementFlag(MOVEFLAG_SPLINE_ENABLED))
+    if (!bot->IsTaxiFlying() && bot->IsStopped() && !bot->movespline->Finalized())
         bot->InterruptMoving(true);
 
     // Leontiesh - fix movement desync

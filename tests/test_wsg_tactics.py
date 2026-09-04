@@ -153,7 +153,8 @@ def main() -> None:
         "void PlayerbotAI::UpdateFaceTarget",
     )
     assert "bot->IsStopped()" in update_ai
-    assert "MOVEFLAG_SPLINE_ENABLED" in update_ai
+    assert "!bot->movespline->Finalized()" in update_ai
+    assert "MOVEFLAG_SPLINE_ENABLED" not in update_ai
     assert "!bot->IsTaxiFlying()" in update_ai
     assert "bot->InterruptMoving(true)" in update_ai
     assert "WSG_MOVEMENT_RECOVERY" not in update_ai
