@@ -20,6 +20,7 @@ def section(source: str, start: str, end: str) -> str:
 def main() -> None:
     tactics = TACTICS.read_text()
     playerbot_ai = PLAYERBOT_AI.read_text()
+    assert '#include "Movement/MoveSpline.h"' in playerbot_ai
     select_objective = tactics.split("bool BGTactics::selectObjective", 1)[1]
     wsg = section(select_objective, "case BATTLEGROUND_WS:", "case BATTLEGROUND_AB:")
     strategy = section(
