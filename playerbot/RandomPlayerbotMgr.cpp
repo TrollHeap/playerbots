@@ -2997,6 +2997,23 @@ void RandomPlayerbotMgr::RandomTeleportForLevel(Player* bot, bool activeOnly)
     if (bot->InBattleGround())
         return;
 
+    if (activeOnly && sPlayerbotAIConfig.randomBotTeleportNearPlayer)
+    {
+        for (auto const& entry : players)
+        {
+            Player* candidate = entry.second;
+            if (!candidate || !candidate->IsInWorld() || candidate->IsBeingTeleported() ||
+                candidate->GetTeam() != bot->GetTeam())
+                continue;
+
+            if (WorldPosition(candidate).HasAreaFlag(AREA_FLAG_CAPITAL))
+            {
+                RandomTeleportForRpg(bot, activeOnly);
+                return;
+            }
+        }
+    }
+
     sLog.outDetail("Preparing location to random teleporting bot %s for level %u", bot->GetName(), bot->GetLevel());
     RandomTeleport(bot, locsPerLevelCache[bot->GetLevel()], false, activeOnly);
     Refresh(bot);
