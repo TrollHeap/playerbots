@@ -55,15 +55,15 @@ namespace ai
 
         bool ValidateScene() const;
         bool SpeakLine();
-        std::string BuildRequest(Player* observer, Player* other) const;
+        std::string BuildRequest(Player* observer) const;
         static BotConversationResult Generate(const std::string& json, const ParsedUrl& endpoint,
-            const std::string& first, const std::string& second, uint32 timeoutSeconds);
+            const std::vector<std::string>& speakers, uint32 timeoutSeconds);
         static void ReapAbandonedFutures();
         void Reset();
 
         Channel channel = Channel::NONE;
         uint32 observerGuid = 0;
-        uint32 otherGuid = 0;
+        std::vector<uint32> participantGuids;
         time_t expires = 0;
         uint32 nextLine = 0;
         bool prepared = false;

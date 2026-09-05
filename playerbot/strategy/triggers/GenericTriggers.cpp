@@ -17,11 +17,6 @@ bool BotConversationTrigger::IsActive()
         ai->GetAiObjectContext()->GetAction("bot conversation"));
     if (!action)
         return false;
-    if (sPlayerbotAIConfig.llmEnabled <= 0)
-    {
-        action->Cancel();
-        return false;
-    }
     if (action->IsPending())
         return true;
     return sPlayerbotAIConfig.llmBotConversationChance > 0 &&

@@ -123,12 +123,14 @@ namespace
         if (now - wave.seen > 30)
             wave = { now, 0 };
         wave.seen = now;
+        if (wave.next >= 3)
+            return 0;
         return now + 2 + 3 * wave.next++;
     }
 
     std::string GuildWelcomeText(std::string const& name, uint32 variant)
     {
-        switch (variant % 16)
+        switch (variant % 24)
         {
             case 0: return "Bienvenue " + name + " !";
             case 1: return "Bienvenue chez nous " + name + " !";
@@ -136,7 +138,7 @@ namespace
             case 3: return "Bienvenue dans la guilde " + name + ".";
             case 4: return "Yo " + name + ", bienvenue :)";
             case 5: return "Bienvenue " + name + ", fais comme chez toi.";
-            case 6: return "Content de t'avoir avec nous " + name + ".";
+            case 6: return "Bienvenue parmi nous " + name + ".";
             case 7: return "Bienvenue " + name + ", ça fait plaisir !";
             case 8: return "Hé " + name + " ! Bienvenue parmi nous.";
             case 9: return "Ça fait un de plus, bienvenue " + name + " !";
@@ -145,7 +147,15 @@ namespace
             case 12: return "Bienvenue " + name + ", pose tes sacs.";
             case 13: return "Ah, du renfort ! Bienvenue " + name + ".";
             case 14: return "Bienvenue " + name + " :)";
-            default: return "Ravi de te voir ici " + name + ", bienvenue !";
+            case 15: return "Bienvenue " + name + ", installe-toi.";
+            case 16: return "Welcome " + name + " !";
+            case 17: return "Bienvenue dans l'équipe " + name + ".";
+            case 18: return "Hey " + name + ", bienvenue parmi nous !";
+            case 19: return "Bienvenue " + name + ", prends une bière :)";
+            case 20: return "Bienvenue " + name + ", hésite pas si t'as besoin.";
+            case 21: return "Bienvenue " + name + " ! Ça fait plaisir.";
+            case 22: return "Welcome " + name + ", amuse-toi bien !";
+            default: return "Bienvenue " + name + ", prends tes marques.";
         }
     }
 }
@@ -3200,6 +3210,9 @@ bool PlayerbotAI::SayToGuild(std::string msg, bool likePlayer)
         return false;
     }
 
+    if (bot->isAFK())
+        bot->ToggleAFK();
+
     if (bot->GetGuildId())
     {
         if (Guild* guild = sGuildMgr.GetGuildById(bot->GetGuildId()))
@@ -3245,9 +3258,12 @@ void PlayerbotAI::QueueGuildWelcome(std::string const& name, ObjectGuid joinedGu
 {
     if (name.empty() || !bot->GetGuildId())
         return;
+    time_t delay = GuildWelcomeDelay(bot->GetGuildId(), joinedGuid);
+    if (!delay)
+        return;
     chatCommands.push(ChatCommandHolder(
         "__guild_welcome " + name, nullptr, CHAT_MSG_GUILD,
-        GuildWelcomeDelay(bot->GetGuildId(), joinedGuid)));
+        delay));
 }
 
 bool PlayerbotAI::SayToWorld(std::string msg)

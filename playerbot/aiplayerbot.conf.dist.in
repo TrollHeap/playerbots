@@ -1100,7 +1100,8 @@ AiPlayerbot.LLMDefaultPromptsFile = llm_character_card.txt
 # The chance (0-100) bots will use ai chat talk to npcs during rpg
 # AiPlayerbot.LLMRpgAIChatChance = 100
 
-# Chance per scan for one observable, grounded bot-to-bot conversation.
+# Chance per scan for one local-catalogue, grounded bot conversation.
+# The historical LLM prefix is kept for configuration compatibility.
 # Disabled by default. LLMBotToBotChatChance remains independent and should stay 0.
 AiPlayerbot.LLMBotConversationChance = 0
 AiPlayerbot.LLMBotConversationInterval = 30

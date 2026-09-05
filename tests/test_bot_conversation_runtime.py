@@ -26,6 +26,7 @@ def main() -> None:
 
     assert "class BotConversationAction" in action_h
     assert "std::future<BotConversationResult>" in action_h
+    assert "std::vector<uint32> participantGuids" in action_h
     assert "BotConversationAction::ValidateScene" in action_cpp
     assert action_cpp.count("ValidateScene()") >= 2
     assert "std::async(std::launch::async" in action_cpp
@@ -41,6 +42,12 @@ def main() -> None:
     assert "LLMBotToBotChatChance" not in action_cpp
     assert "detach()" not in action_cpp
     assert "urand(3000, 5000)" in action_cpp
+    assert "result.lines.size() == 4" in action_cpp
+    assert "result.lines.empty() || result.lines.size() > 4" in action_cpp
+    assert '\\"context\\"' in action_cpp and "AREA_FLAG_CAPITAL" in action_cpp
+    assert "matched.size() == 2" in action_cpp
+    assert "for (uint32 guid : participantGuids)" in action_cpp
+    assert "speaker->isAFK()" in action_cpp and "speaker->ToggleAFK()" in action_cpp
     assert action_cpp.count("WorldTimer::getMSTime()") == 3
     speak = action_cpp.split("bool BotConversationAction::SpeakLine()", 1)[1].split(
         "void BotConversationAction::Reset()", 1
@@ -48,15 +55,14 @@ def main() -> None:
     battleground_delivery = speak.split("else if (channel == Channel::BATTLEGROUND)", 1)[1].split(
         "else if", 1
     )[0]
-    assert "observerGuid" in battleground_delivery
-    assert "sServerFacade.SendPacket(observer, data)" in battleground_delivery
-    assert "SayToRaid" not in battleground_delivery
+    assert "SayToRaid(lines[line].message)" in battleground_delivery
+    assert "sServerFacade.SendPacket(observer, data)" not in battleground_delivery
 
     assert "class BotConversationTrigger" in trigger_h
     assert "llmBotConversationInterval" in trigger_h
     assert "BotConversationTrigger::IsActive" in trigger_cpp
-    assert "action->Cancel();" in trigger_cpp
-    assert trigger_cpp.index("sPlayerbotAIConfig.llmEnabled <= 0") < trigger_cpp.index("action->IsPending()")
+    assert "sPlayerbotAIConfig.llmEnabled <= 0" not in trigger_cpp
+    assert "action->IsPending()" in trigger_cpp
     assert 'creators["bot conversation"]' in (
         (ROOT / "playerbot/strategy/actions/ActionContext.h").read_text()
         + (ROOT / "playerbot/strategy/triggers/TriggerContext.h").read_text()

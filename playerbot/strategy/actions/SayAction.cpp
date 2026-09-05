@@ -213,42 +213,49 @@ bool BotConversationAction::CanStart()
         {
             if (!observerReady(observer))
                 continue;
+            auto matches = [this, candidate, observer](Player* player)
+            {
+                if (!IsConversationBot(player) || player->GetTeam() != observer->GetTeam())
+                    return false;
+                if (candidate == Channel::BATTLEGROUND)
+                    return IsActiveBattleGround(observer) && IsActiveBattleGround(player) &&
+                        player->GetMapId() == observer->GetMapId() &&
+                        player->GetInstanceId() == observer->GetInstanceId();
+                if (candidate == Channel::RAID || candidate == Channel::PARTY)
+                    return player->GetGroup() && player->GetGroup() == observer->GetGroup() &&
+                        player->GetGroup()->IsRaidGroup() == (candidate == Channel::RAID);
+                if (candidate == Channel::GUILD)
+                    return player->GetGuildId() && player->GetGuildId() == observer->GetGuildId();
+                float range = sWorld.getConfig(CONFIG_FLOAT_LISTEN_RANGE_SAY);
+                return player->IsWithinDistInMap(observer, range);
+            };
+            if (!matches(bot))
+                continue;
+
+            std::vector<uint32> matched;
             for (Player* other : bots)
             {
-                bool match = false;
-                if (candidate == Channel::BATTLEGROUND)
-                    match = IsActiveBattleGround(bot) && IsActiveBattleGround(observer) && IsActiveBattleGround(other) &&
-                        bot->GetMapId() == observer->GetMapId() && bot->GetMapId() == other->GetMapId() &&
-                        bot->GetInstanceId() == observer->GetInstanceId() && bot->GetInstanceId() == other->GetInstanceId();
-                else if (candidate == Channel::RAID || candidate == Channel::PARTY)
-                    match = bot->GetGroup() && bot->GetGroup() == observer->GetGroup() &&
-                        bot->GetGroup() == other->GetGroup() && bot->GetGroup()->IsRaidGroup() == (candidate == Channel::RAID);
-                else if (candidate == Channel::GUILD)
-                    match = bot->GetGuildId() && bot->GetGuildId() == observer->GetGuildId() &&
-                        bot->GetGuildId() == other->GetGuildId();
-                else
-                {
-                    float range = sWorld.getConfig(CONFIG_FLOAT_LISTEN_RANGE_SAY);
-                    match = bot->IsWithinDistInMap(observer, range) && other->IsWithinDistInMap(observer, range);
-                }
-                if (!match)
+                if (!matches(other))
                     continue;
-
-                bool expected = false;
-                if (!inFlight.compare_exchange_strong(expected, true))
-                    return false;
-                ownsFlight = true;
-                channel = candidate;
-                observerGuid = observer->GetGUIDLow();
-                otherGuid = other->GetGUIDLow();
-                prepared = true;
-                canceled = false;
-                {
-                    std::scoped_lock lock(cooldownMutex);
-                    observerCooldowns[observerGuid] = now + sPlayerbotAIConfig.llmBotConversationCooldown;
-                }
-                return true;
+                matched.push_back(other->GetGUIDLow());
+                if (matched.size() == 2)
+                    break;
             }
+
+            bool expected = false;
+            if (!inFlight.compare_exchange_strong(expected, true))
+                return false;
+            ownsFlight = true;
+            channel = candidate;
+            observerGuid = observer->GetGUIDLow();
+            participantGuids = std::move(matched);
+            prepared = true;
+            canceled = false;
+            {
+                std::scoped_lock lock(cooldownMutex);
+                observerCooldowns[observerGuid] = now + sPlayerbotAIConfig.llmBotConversationCooldown;
+            }
+            return true;
         }
     }
     return false;
@@ -257,29 +264,35 @@ bool BotConversationAction::CanStart()
 bool BotConversationAction::ValidateScene() const
 {
     Player* observer = sObjectMgr.GetPlayer(ObjectGuid(HIGHGUID_PLAYER, observerGuid));
-    Player* other = sObjectMgr.GetPlayer(ObjectGuid(HIGHGUID_PLAYER, otherGuid));
-    if (!IsHumanWitness(observer) || !IsConversationBot(bot) || !IsConversationBot(other) ||
-        observer->GetTeam() != bot->GetTeam() || other->GetTeam() != bot->GetTeam())
+    if (!IsHumanWitness(observer) || !IsConversationBot(bot) || observer->GetTeam() != bot->GetTeam())
         return false;
-
-    if (channel == Channel::BATTLEGROUND)
-        return IsActiveBattleGround(bot) && IsActiveBattleGround(observer) && IsActiveBattleGround(other) &&
-            bot->GetMapId() == observer->GetMapId() && bot->GetMapId() == other->GetMapId() &&
-            bot->GetInstanceId() == observer->GetInstanceId() && bot->GetInstanceId() == other->GetInstanceId();
-    if (channel == Channel::RAID || channel == Channel::PARTY)
-        return bot->GetGroup() && bot->GetGroup() == observer->GetGroup() && bot->GetGroup() == other->GetGroup() &&
-            bot->GetGroup()->IsRaidGroup() == (channel == Channel::RAID);
-    if (channel == Channel::GUILD)
-        return bot->GetGuildId() && bot->GetGuildId() == observer->GetGuildId() && bot->GetGuildId() == other->GetGuildId();
-    if (channel == Channel::SAY)
+    std::vector<Player*> participants = { bot };
+    for (uint32 guid : participantGuids)
     {
-        float range = sWorld.getConfig(CONFIG_FLOAT_LISTEN_RANGE_SAY);
-        return bot->IsWithinDistInMap(observer, range) && other->IsWithinDistInMap(observer, range);
+        Player* participant = sObjectMgr.GetPlayer(ObjectGuid(HIGHGUID_PLAYER, guid));
+        if (!IsConversationBot(participant) || participant->GetTeam() != bot->GetTeam())
+            return false;
+        participants.push_back(participant);
     }
-    return false;
+    for (Player* participant : participants)
+    {
+        if (channel == Channel::BATTLEGROUND && (!IsActiveBattleGround(observer) || !IsActiveBattleGround(participant) ||
+            participant->GetMapId() != observer->GetMapId() || participant->GetInstanceId() != observer->GetInstanceId()))
+            return false;
+        if ((channel == Channel::RAID || channel == Channel::PARTY) && (!participant->GetGroup() ||
+            participant->GetGroup() != observer->GetGroup() ||
+            participant->GetGroup()->IsRaidGroup() != (channel == Channel::RAID)))
+            return false;
+        if (channel == Channel::GUILD && (!participant->GetGuildId() || participant->GetGuildId() != observer->GetGuildId()))
+            return false;
+        if (channel == Channel::SAY && !participant->IsWithinDistInMap(
+            observer, sWorld.getConfig(CONFIG_FLOAT_LISTEN_RANGE_SAY)))
+            return false;
+    }
+    return channel != Channel::NONE;
 }
 
-std::string BotConversationAction::BuildRequest(Player* observer, Player* other) const
+std::string BotConversationAction::BuildRequest(Player* observer) const
 {
     WorldPosition position(bot);
     std::string location = position.getAreaName();
@@ -290,17 +303,25 @@ std::string BotConversationAction::BuildRequest(Player* observer, Player* other)
 
     std::ostringstream out;
     out << "{\"observer\":{\"guid\":" << observerGuid << ",\"name\":" << JsonString(observer->GetName()) << "}"
-        << ",\"channel\":" << JsonString(channelName) << ",\"location\":" << JsonString(location)
-        << ",\"participants\":["
+        << ",\"channel\":" << JsonString(channelName)
+        << ",\"context\":" << JsonString(channel == Channel::SAY && WorldPosition(bot).HasAreaFlag(AREA_FLAG_CAPITAL)
+            ? "capital" : channel == Channel::SAY ? "outdoor" : "")
+        << ",\"location\":" << JsonString(location) << ",\"participants\":["
         << "{\"guid\":" << bot->GetGUIDLow() << ",\"name\":" << JsonString(bot->GetName())
-        << ",\"snapshot\":" << SnapshotJson(bot, observer, "constater") << "},"
-        << "{\"guid\":" << other->GetGUIDLow() << ",\"name\":" << JsonString(other->GetName())
-        << ",\"snapshot\":" << SnapshotJson(other, observer, otherGuid % 2 ? "approuver" : "clore") << "}]}";
+        << ",\"snapshot\":" << SnapshotJson(bot, observer, "constater") << "}";
+    for (uint32 guid : participantGuids)
+    {
+        Player* participant = sObjectMgr.GetPlayer(ObjectGuid(HIGHGUID_PLAYER, guid));
+        if (participant)
+            out << ",{\"guid\":" << participant->GetGUIDLow() << ",\"name\":" << JsonString(participant->GetName())
+                << ",\"snapshot\":" << SnapshotJson(participant, observer, guid % 2 ? "approuver" : "clore") << "}";
+    }
+    out << "]}";
     return out.str();
 }
 
 BotConversationResult BotConversationAction::Generate(const std::string& json, const ParsedUrl& endpoint,
-    const std::string& first, const std::string& second, uint32 timeoutSeconds)
+    const std::vector<std::string>& speakers, uint32 timeoutSeconds)
 {
     std::vector<std::string> debug;
     std::string response = PlayerbotLLMInterface::GenerateAt(json, endpoint, timeoutSeconds, 1, debug);
@@ -308,14 +329,22 @@ BotConversationResult BotConversationAction::Generate(const std::string& json, c
     std::sregex_iterator begin(response.begin(), response.end(), pattern);
     std::sregex_iterator end;
     BotConversationResult result;
-    for (auto it = begin; it != end && result.lines.size() < 2; ++it)
+    for (auto it = begin; it != end; ++it)
+    {
+        if (result.lines.size() == 4)
+        {
+            result.lines.clear();
+            return result;
+        }
         result.lines.push_back({ UnescapeJson((*it)[1]), UnescapeJson((*it)[2]) });
-    if (result.lines.size() != 2 || result.lines[0].speaker != first || result.lines[1].speaker != second)
+    }
+    if (result.lines.empty() || result.lines.size() > 4)
         result.lines.clear();
     for (BotConversationLine const& item : result.lines)
     {
         std::wstring message;
-        if (item.message.empty() || !Utf8toWStr(item.message, message) || message.size() > 100 ||
+        if (std::find(speakers.begin(), speakers.end(), item.speaker) == speakers.end() ||
+            item.message.empty() || !Utf8toWStr(item.message, message) || message.size() > 100 ||
             item.message.find('\n') != std::string::npos ||
             item.message.find('*') != std::string::npos || item.message[0] == '/' || item.message[0] == '.' ||
             item.message[0] == '!')
@@ -331,10 +360,17 @@ bool BotConversationAction::SpeakLine()
 {
     if (!ValidateScene() || line >= lines.size())
         return false;
-    Player* speaker = lines[line].speaker == bot->GetName() ? bot :
-        sObjectMgr.GetPlayer(ObjectGuid(HIGHGUID_PLAYER, otherGuid));
+    Player* speaker = lines[line].speaker == bot->GetName() ? bot : nullptr;
+    for (uint32 guid : participantGuids)
+    {
+        Player* participant = sObjectMgr.GetPlayer(ObjectGuid(HIGHGUID_PLAYER, guid));
+        if (participant && lines[line].speaker == participant->GetName())
+            speaker = participant;
+    }
     if (!speaker || lines[line].speaker != speaker->GetName())
         return false;
+    if (speaker->isAFK())
+        speaker->ToggleAFK();
 
     bool spoken = false;
     if (channel == Channel::GUILD)
@@ -342,17 +378,7 @@ bool BotConversationAction::SpeakLine()
     else if (channel == Channel::PARTY)
         spoken = speaker->GetPlayerbotAI()->SayToParty(lines[line].message, true);
     else if (channel == Channel::BATTLEGROUND)
-    {
-        Player* observer = sObjectMgr.GetPlayer(ObjectGuid(HIGHGUID_PLAYER, observerGuid));
-        if (IsHumanWitness(observer))
-        {
-            WorldPacket data;
-            ChatHandler::BuildChatPacket(data, CHAT_MSG_RAID, lines[line].message.c_str(), LANG_UNIVERSAL,
-                CHAT_TAG_NONE, speaker->GetObjectGuid(), speaker->GetName());
-            sServerFacade.SendPacket(observer, data);
-            spoken = true;
-        }
-    }
+        spoken = speaker->GetPlayerbotAI()->SayToRaid(lines[line].message);
     else if (channel == Channel::RAID)
         spoken = speaker->GetPlayerbotAI()->SayToRaid(lines[line].message);
     else
@@ -372,7 +398,7 @@ void BotConversationAction::Reset()
 {
     channel = Channel::NONE;
     observerGuid = 0;
-    otherGuid = 0;
+    participantGuids.clear();
     expires = 0;
     nextLine = 0;
     prepared = false;
@@ -394,17 +420,21 @@ bool BotConversationAction::Execute(Event& event)
             return false;
         }
         Player* observer = sObjectMgr.GetPlayer(ObjectGuid(HIGHGUID_PLAYER, observerGuid));
-        Player* other = sObjectMgr.GetPlayer(ObjectGuid(HIGHGUID_PLAYER, otherGuid));
-        std::string json = BuildRequest(observer, other);
+        std::string json = BuildRequest(observer);
         ParsedUrl endpoint = sPlayerbotAIConfig.llmEndPointUrl;
         endpoint.path = "/v1/bot-conversations";
-        std::string first = bot->GetName();
-        std::string second = other->GetName();
+        std::vector<std::string> speakers = { bot->GetName() };
+        for (uint32 guid : participantGuids)
+        {
+            Player* participant = sObjectMgr.GetPlayer(ObjectGuid(HIGHGUID_PLAYER, guid));
+            if (participant)
+                speakers.push_back(participant->GetName());
+        }
         uint32 timeoutSeconds = std::max<uint32>(1,
             std::min(sPlayerbotAIConfig.llmGenerationTimeout, sPlayerbotAIConfig.llmBotConversationExpiration));
         future = std::async(std::launch::async,
-            [json, endpoint, first, second, timeoutSeconds]()
-            { return Generate(json, endpoint, first, second, timeoutSeconds); });
+            [json, endpoint, speakers, timeoutSeconds]()
+            { return Generate(json, endpoint, speakers, timeoutSeconds); });
         prepared = false;
         expires = time(nullptr) + sPlayerbotAIConfig.llmBotConversationExpiration;
         return true;
@@ -417,7 +447,7 @@ bool BotConversationAction::Execute(Event& event)
         if (future.wait_for(std::chrono::seconds(0)) == std::future_status::timeout)
             return true;
         BotConversationResult result = future.get();
-        if (canceled || result.lines.size() != 2 || !ValidateScene())
+        if (canceled || result.lines.empty() || result.lines.size() > 4 || !ValidateScene())
         {
             Reset();
             return false;
